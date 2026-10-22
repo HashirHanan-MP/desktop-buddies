@@ -171,12 +171,12 @@
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#8ff0ff';
       ctx.fillText(((ART && ART.cardTitle ? ART.cardTitle(h) : 'MK-XLII') + ' · ' + h.status.toUpperCase()).slice(0, 28), 6, 8);
-      const rows = meters.map((m) => [m.short || m.label.slice(0, 3).toUpperCase(), m.v, m.color]);
-      rows.forEach(([l, v, col], i) => {
+      const rows = meters.map((m) => [m.short || m.label.slice(0, 3).toUpperCase(), m.v, m.color, m.invert]);
+      rows.forEach(([l, v, col, inv], i) => {
         const y = 19 + i * 10;
         ctx.fillStyle = 'rgba(143,240,255,0.8)'; ctx.fillText(l, 6, y);
         ctx.fillStyle = 'rgba(143,240,255,0.15)'; ctx.fillRect(26, y - 2.5, w - 34, 5);
-        ctx.fillStyle = v < 20 ? '#ff4d5e' : col; ctx.fillRect(26, y - 2.5, (w - 34) * clamp(v / 100, 0, 1), 5);
+        ctx.fillStyle = v < 20 && !inv ? '#ff4d5e' : col; ctx.fillRect(26, y - 2.5, (w - 34) * clamp(v / 100, 0, 1), 5);
       });
       ctx.restore();
     }

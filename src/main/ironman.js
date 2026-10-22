@@ -359,7 +359,7 @@ class Hero {
   * repulsor(tp, enemy, shots) {
     const w = this.w, s = this.s;
     for (let i = 0; i < (shots || 1); i++) {
-      if (enemy && enemy.hp <= 0) return;
+      if (enemy && enemy.hp <= 0) break; // someone else got it: lower the arm (aiming blocks recharging)
       const t0 = enemy ? w.enemyCenter(enemy) : tp;
       this.aimAt(t0, 'near');
       this.setPose('aim');
@@ -748,6 +748,7 @@ class Hero {
       // power management: land and recharge a bit when nearly empty
       if (this.power < 6) {
         this.say('POWER CRITICAL', 'warn');
+        this.aim = null; this.charge = 0; // the reactor only recharges while not aiming
         if (this.mode === 'air') yield* this.land();
         this.setPose('stand');
         yield* this.wait(3, () => this.power > 30);

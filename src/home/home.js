@@ -107,6 +107,7 @@
     const sb = $('#suitBars');
     sb.innerHTML = '';
     bars(sb, (s.hero.meters || []).map((m) => [m.k, m.label, m.color]));
+    for (const m of s.hero.meters || []) if (m.invert) sb.querySelector(`[data-k="${m.k}"]`).dataset.invert = '1';
     const q = $('#ironQuick');
     q.innerHTML = '';
     quick(q, ui.quick || []);
@@ -263,7 +264,7 @@
       const v = Math.round(values[row.dataset.k] || 0);
       row.querySelector('.fill').style.width = v + '%';
       row.querySelector('.pct').textContent = v + '%';
-      row.classList.toggle('low', v < (low || 20));
+      row.classList.toggle('low', v < (low || 20) && !row.dataset.invert);
     }
   }
 

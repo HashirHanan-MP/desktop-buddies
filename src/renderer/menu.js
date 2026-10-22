@@ -260,19 +260,20 @@
     const st = statsOf(s);
     const hm = isHero(s) ? s.hero.meters || [] : null;
     const rows = hm
-      ? hm.map((x) => [x.icon, x.k, x.label, x.color])
+      ? hm.map((x) => [x.icon, x.k, x.label, x.color, x.invert])
       : [['🍗', 'food', 'Food'], ['⚡', 'energy', 'Energy'], ['🧶', 'fun', 'Fun'], ['🫧', 'clean', 'Clean'], ['❤️', 'health', 'Health']];
     if (hm) m.style.gridTemplateColumns = `repeat(${rows.length}, 1fr)`;
-    for (const [ic, k, label, color] of rows) {
+    for (const [ic, k, label, color, invert] of rows) {
       const r = el('div', 'meter');
       r.title = `${label}: ${Math.round(st[k])}%`;
       r.appendChild(el('span', 'mi', ic));
       const bar = el('span', 'bar');
       const fill = el('span', 'fill ' + k);
       fill.dataset.k = k;
+      if (invert) fill.dataset.invert = '1'; // low is good here (e.g. rage): no warning
       if (color) { fill.style.background = color; fill.style.color = color; }
       fill.style.width = Math.round(st[k]) + '%';
-      if (st[k] < 20) fill.classList.add('low');
+      if (st[k] < 20 && !invert) fill.classList.add('low');
       bar.appendChild(fill);
       r.appendChild(bar);
       m.appendChild(r);
@@ -288,7 +289,7 @@
     panel.querySelectorAll('.fill').forEach((f) => {
       const v = st[f.dataset.k];
       f.style.width = Math.round(v) + '%';
-      f.classList.toggle('low', v < 20);
+      f.classList.toggle('low', v < 20 && !f.dataset.invert);
     });
     const mood = panel.querySelector('.mood');
     if (mood && isHero(s)) mood.textContent = heroMood(s);

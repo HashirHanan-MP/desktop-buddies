@@ -1,4 +1,4 @@
-/* Desktop Buddies — home window: character switcher, care / suit status, reminders, settings. */
+/* Desktop Buddies — home window: character switcher, care / hero status, reminders, settings. */
 (function () {
   'use strict';
   const api = window.catAPI;
@@ -14,19 +14,17 @@
 
   // ------------------------------------------------------------ static content
   const NEEDS = [['food', 'Food', '#ff9f43'], ['energy', 'Energy', '#5d7cf0'], ['fun', 'Fun', '#ff5fa2'], ['clean', 'Clean', '#2ec4b6'], ['health', 'Health', '#4cd964'], ['love', 'Love', '#ff6b8b']];
-  const SUITBARS = [['power', 'Arc reactor', '#4fd8ff'], ['armor', 'Armor', '#ffd166'], ['missiles', 'Missiles', '#ff7a6b']];
+  const isHero = (ch) => ch && ch !== 'cat';
+  const artOf = (ch) => (window.HeroArts && window.HeroArts[ch]) || window.HeroArts.ironman;
   const QUICK = [
     ['🐟', 'Fish', 'feed', { kind: 'fish' }], ['🍤', 'Treat', 'treat'], ['🛏️', 'Bed', 'bed'], ['⏰', 'Wake', 'wake'],
     ['🐭', 'Mouse', 'toyMouse', null, 'mouse'], ['🔴', 'Laser', 'laser', null, 'laser'], ['🧶', 'Yarn', 'yarn'], ['📦', 'Box', 'box'],
     ['✨', 'Clean all', 'cleanAll'], ['🧴', 'Fix all', 'fixAll'], ['🗂️', 'Tidy files', 'tidyFiles'], ['👋', 'Call', 'call'],
   ];
   const ENEMIES = [['🛸', 'Drone', 'drone'], ['🤖', 'Walker', 'walker'], ['🛞', 'Tank', 'tank'], ['🐝', 'Swarm', 'swarm'], ['👾', 'Boss', 'boss'], ['🧹', 'Clear', null]];
-  const IRONQ = [['🔄', 'Patrol', 'patrol'], ['💨', 'Fly-by', 'flyby'], ['📡', 'Scan', 'scan'], ['🖥️', 'Diagnostics', 'diagnostics'], ['🛠️', 'Repair', 'repair'], ['⚡', 'Recharge', 'recharge'], ['🦾', 'Call Legion', 'callLegion', { count: 3 }], ['👋', 'Dismiss Legion', 'dismissLegion']];
   const STATS = [['meals', 'meals eaten'], ['treats', 'treats'], ['pets', 'pets'], ['poopsCleaned', 'poops scooped'], ['scratchesFixed', 'scratches fixed'], ['filesTidied', 'files tidied'], ['miceCaught', 'mice caught'], ['laserPounces', 'laser pounces'], ['naps', 'naps']];
-  const ISTATS = [['kills', 'threats down'], ['drones', 'drones'], ['walkers', 'walkers'], ['tanks', 'tanks'], ['bosses', 'heavy mechs'], ['armiesWon', 'armies beaten'], ['nukes', 'nukes dropped'], ['legion', 'legion suits called'], ['waves', 'waves cleared'], ['shotsFired', 'repulsor shots'], ['missiles', 'missiles fired'], ['reboots', 'suit reboots']];
   const FUR = { white: '#ffffff', cream: '#f6e3c6', silver: '#c9cdd8', ginger: '#f5a65b', black: '#34353f' };
   const EYES = { blue: '#6cb6ff', green: '#8bd06a', amber: '#f3b443', odd: 'linear-gradient(90deg,#6cb6ff 50%,#f3b443 50%)' };
-  const SUITS = { classic: 'linear-gradient(135deg,#c41f2a 55%,#f2b134 55%)', stealth: 'linear-gradient(135deg,#343843 55%,#9aa3b3 55%)', silver: 'linear-gradient(135deg,#b8bfca 55%,#e1e5eb 55%)', patriot: 'linear-gradient(135deg,#26408f 55%,#ffffff 55%)' };
 
   function bars(container, defs) {
     for (const [k, label, color] of defs) {
@@ -66,9 +64,7 @@
   }
 
   bars($('#needs'), NEEDS);
-  bars($('#suitBars'), SUITBARS);
   quick($('#quick'), QUICK);
-  quick($('#ironQuick'), IRONQ);
   for (const [e, label, kind] of ENEMIES) {
     const b = el('button', 'qa');
     b.append(el('span', 'e', e), el('span', '', label));
@@ -76,11 +72,9 @@
     $('#ironEnemies').appendChild(b);
   }
   stats($('#stats'), STATS);
-  const LEGION = { small: 2, medium: 3, large: 5, massive: 7, epic: 7, legendary: 7 };
   const armyNote = () => {
-    const v = $('#armySize').value;
-    $('#armyNote').textContent = v === 'legendary' ? 'All 7 Iron Legion suits join, with replacements when one goes down. About 4 minutes of war.'
-      : `Iron Man will call ${LEGION[v]} more suits from the Iron Legion.`;
+    const notes = state && state.ui && state.ui.armyNotes;
+    $('#armyNote').textContent = notes ? notes[$('#armySize').value] || '' : '';
   };
   $('#armySize').addEventListener('change', armyNote);
   armyNote();
@@ -104,10 +98,60 @@
       box.appendChild(b);
     }
   }
-  stats($('#ironStats'), ISTATS);
   swatches($('#fur'), FUR, 'palette');
   swatches($('#eyes'), EYES, 'eyes', (k) => (k === 'odd' ? 'odd-eyed' : k));
-  swatches($('#suits'), SUITS, 'suit');
+
+  // ------------------------------------------------------------ the hero parts, rebuilt when the character changes
+  function buildHero(s) {
+    const ui = s.ui || {};
+    const sb = $('#suitBars');
+    sb.innerHTML = '';
+    bars(sb, (s.hero.meters || []).map((m) => [m.k, m.label, m.color]));
+    const q = $('#ironQuick');
+    q.innerHTML = '';
+    quick(q, ui.quick || []);
+    const st = $('#ironStats');
+    st.innerHTML = '';
+    stats(st, ui.stats || []);
+    const sw = $('#suits');
+    sw.innerHTML = '';
+    if (ui.looks) swatches(sw, Object.fromEntries(ui.looks.options.map(([k, , col]) => [k, col])), ui.looks.key, (k) => (ui.looks.options.find((o) => o[0] === k) || [k, k])[1]);
+    $('#looksRow').style.display = ui.looks ? '' : 'none';
+    $('#heroSize').dataset.k = ui.sizeKey || 'ironSize';
+    const help = $('#heroHelp');
+    help.innerHTML = '';
+    for (const [title, html] of ui.help || []) {
+      help.appendChild(el('h4', '', title));
+      const para = el('p');
+      para.innerHTML = html; // our own static guide text
+      help.appendChild(para);
+    }
+    armyNote();
+  }
+
+  let switchKey = '';
+  function renderSwitcher(s) {
+    const list = s.characters || [];
+    const key = JSON.stringify(list.map((c) => c.id));
+    const box = $('#switcher');
+    box.style.display = list.length > 1 ? '' : 'none';
+    if (key === switchKey) return;
+    switchKey = key;
+    box.innerHTML = '';
+    avs.length = 0;
+    for (const c of list) {
+      const b = el('button', 'char');
+      b.dataset.char = c.id;
+      const cv = document.createElement('canvas');
+      cv.width = 32 * dpr; cv.height = 32 * dpr;
+      const sp = el('span');
+      sp.append(el('b', '', c.name), el('small', 'csub'));
+      b.append(cv, sp);
+      b.addEventListener('click', () => cmd('character', { name: c.id }));
+      box.appendChild(b);
+      avs.push({ cv, x: cv.getContext('2d'), who: c.id });
+    }
+  }
 
   // ------------------------------------------------------------ tabs & switcher
   function showTab(name) {
@@ -117,14 +161,12 @@
   }
   $$('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
   api.on('home:tab', (t) => showTab(t));
-  $$('.char').forEach((b) => b.addEventListener('click', () => cmd('character', { name: b.dataset.char })));
 
   // ------------------------------------------------------------ settings inputs
   $$('[data-k]').forEach((input) => {
     if (input.classList.contains('need') || input.classList.contains('stat')) return;
-    const k = input.dataset.k;
     input.addEventListener(input.type === 'range' ? 'input' : 'change', () => {
-      setting(k, input.type === 'checkbox' ? input.checked : input.type === 'range' ? +input.value : input.value);
+      setting(input.dataset.k, input.type === 'checkbox' ? input.checked : input.type === 'range' ? +input.value : input.value);
     });
   });
   const nameEl = $('#name');
@@ -230,26 +272,33 @@
     const ch = s.character;
     document.body.dataset.platform = s.platform;
     document.body.dataset.character = ch;
+    document.body.dataset.theme = isHero(ch) ? artOf(ch).theme : 'cat';
+    renderSwitcher(s);
+    const me = (s.characters || []).find((c) => c.id === ch);
     if (ch !== prevChar) {
-      if (tab !== 'reminders' && tab !== 'settings' && tab !== 'help') showTab(ch === 'ironman' ? 'suit' : 'cat');
-      document.title = ch === 'ironman' ? 'Desktop Buddies — HQ' : 'Desktop Buddies — Cat Home';
+      if (tab !== 'reminders' && tab !== 'settings' && tab !== 'help') showTab(isHero(ch) ? 'suit' : 'cat');
+      document.title = `${s.appName || 'Desktop Buddies'} — ${me ? me.home : 'Home'}`;
+      if (isHero(ch)) buildHero(s);
     }
-    $$('.char').forEach((b) => b.classList.toggle('on', b.dataset.char === ch));
-    if (s.others) {
-      $('#catSub').textContent = s.others.cat.dead ? 'resting' : s.others.cat.name;
-      $('#ironSub').textContent = s.others.ironman.status;
-    }
-    if (ch === 'ironman') {
+    $$('.char').forEach((b) => {
+      b.classList.toggle('on', b.dataset.char === ch);
+      const o = s.others && s.others[b.dataset.char];
+      if (o) b.querySelector('.csub').textContent = b.dataset.char === 'cat' ? (o.dead ? 'resting' : o.name) : o.status;
+    });
+    $('#quitBtn').textContent = `Quit ${s.appName || 'Desktop Buddies'}`;
+    if (isHero(ch)) {
       const h = s.hero;
-      $('#age').textContent = 'MARK XLII';
+      $('#heroName').textContent = artOf(ch).name;
+      $('#age').textContent = h.title || '';
       $('#mood').textContent = h.status;
-      setBars($('#suitBars'), { power: h.power, armor: h.armor, missiles: (h.missiles / 12) * 100 });
+      setBars($('#suitBars'), Object.fromEntries((h.meters || []).map((m) => [m.k, m.v])));
       for (const d of $('#ironStats').children) d.querySelector('b').textContent = (s.counters[d.dataset.k] || 0).toLocaleString();
       renderScreens(s.displays || []);
       $('#armyGo').disabled = !!s.army;
       $('#armyGo').textContent = s.army ? 'Battle in progress…' : 'Launch';
       $$('.nukebtn').forEach((b) => { b.disabled = !!s.nuke; });
-      $$('#suits .sw').forEach((b) => b.classList.toggle('on', b.dataset.v === s.settings.suit));
+      const lk = s.ui && s.ui.looks && s.ui.looks.key;
+      $$('#suits .sw').forEach((b) => b.classList.toggle('on', !!lk && b.dataset.v === s.settings[lk]));
     } else if (s.cat) {
       const c = s.cat;
       if (!editingName) nameEl.value = c.name;
@@ -339,15 +388,20 @@
     px.setTransform(dpr, 0, 0, dpr, 0, 0);
     px.clearRect(0, 0, 150, 95);
     px.save();
-    if (state.character === 'ironman') {
-      px.fillStyle = 'rgba(90,220,255,0.14)';
+    if (isHero(state.character)) {
+      const ART = artOf(state.character);
+      const look = state.ui && state.ui.looks ? state.settings[state.ui.looks.key] : null;
+      px.fillStyle = ART.shadowTint || 'rgba(90,220,255,0.14)';
       px.beginPath(); px.ellipse(75, 91, 40, 4, 0, 0, Math.PI * 2); px.fill();
       px.translate(75, 91);
-      px.scale(0.92, 0.92);
-      const pose = state.hero.mode === 'down' ? 'down' : Math.sin(T * 0.25) > 0.6 ? 'thumbsUp' : 'stand';
-      const rig = IronArt.makeRig(pose, { t: T % 4, T, phase: 0, m: {} });
-      rig.turn = Math.max(rig.turn, 0.55);
-      IronArt.drawHero(px, rig, { suit: state.settings.suit, T });
+      if (ART.drawPortrait) ART.drawPortrait(px, state, T, look);
+      else {
+        px.scale(0.92, 0.92);
+        const pose = state.hero.mode === 'down' ? 'down' : Math.sin(T * 0.25) > 0.6 ? 'thumbsUp' : 'stand';
+        const rig = ART.makeRig(pose, { t: T % 4, T, phase: 0, m: {} });
+        rig.turn = Math.max(rig.turn, 0.55);
+        ART.drawHero(px, rig, { suit: look, look, T });
+      }
     } else if (state.cat) {
       px.fillStyle = 'rgba(0,0,0,0.1)';
       px.beginPath(); px.ellipse(75, 88, 46, 5, 0, 0, Math.PI * 2); px.fill();
@@ -359,8 +413,14 @@
       a.x.setTransform(dpr, 0, 0, dpr, 0, 0);
       a.x.clearRect(0, 0, 32, 32);
       a.x.save();
-      if (a.who === 'ironman') { a.x.translate(16, 70); a.x.scale(0.6, 0.6); IronArt.drawBust(a.x, state.settings.suit, T); }
-      else {
+      if (isHero(a.who)) {
+        const ART = artOf(a.who);
+        const key = ART.lookKey;
+        const look = key ? state.settings[key] : null;
+        a.x.scale(32 / 46, 32 / 46);
+        if (ART.drawAvatar) ART.drawAvatar(a.x, look, T);
+        else { a.x.translate(21, 108); a.x.scale(0.95, 0.95); ART.drawBust(a.x, look, T); }
+      } else {
         a.x.translate(16, 41); a.x.scale(0.52, 0.52);
         CatArt.drawCat(a.x, CatArt.makePose('sitFront', { t: T, T, phase: 0, m: {} }), { eyes: 'normal', blush: 0.3 }, { T, palette: state.settings.palette, eyes: (state.cat && state.cat.eyes) || 'blue' });
       }

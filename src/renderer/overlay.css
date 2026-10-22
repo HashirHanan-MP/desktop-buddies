@@ -93,8 +93,9 @@ html, body {
 
 /* ------------------------------------------------------------ Iron Man HUD theme */
 .meters.three { grid-template-columns: repeat(3, 1fr); }
+.menu.hero .fill { color: inherit; }
 .fill.power { background: #4fd8ff; } .fill.armor { background: #ffd166; } .fill.missiles { background: #ff7a6b; }
-.menu.iron {
+.menu[data-theme="iron"] {
   background: linear-gradient(160deg, rgba(10, 26, 44, 0.96), rgba(4, 12, 22, 0.97));
   color: #d8f6ff;
   border: 1px solid rgba(90, 220, 255, 0.5);
@@ -103,27 +104,27 @@ html, body {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   letter-spacing: 0.2px;
 }
-.menu.iron::before {
+.menu[data-theme="iron"]::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 3px;
   background: repeating-linear-gradient(0deg, rgba(120, 220, 255, 0.035) 0 1px, transparent 1px 3px);
 }
-.menu.iron::after {
+.menu[data-theme="iron"]::after {
   content: ""; position: absolute; left: 10px; right: 10px; top: -1px; height: 2px;
   background: linear-gradient(90deg, transparent, #5ee0ff, transparent);
 }
-.menu.iron .item { border-radius: 2px; }
-.menu.iron .item:hover, .menu.iron .item.open { background: rgba(90, 220, 255, 0.13); box-shadow: inset 2px 0 0 #5ee0ff; }
-.menu.iron .name { color: #ffd166; letter-spacing: 2.5px; font-size: 14px; }
-.menu.iron .mood { color: #7fdfff; text-transform: uppercase; font-size: 10px; letter-spacing: 0.8px; }
-.menu.iron .hint { color: rgba(140, 220, 255, 0.6); }
-.menu.iron .sep { background: rgba(90, 220, 255, 0.22); }
-.menu.iron .meters { border-color: rgba(90, 220, 255, 0.22); }
-.menu.iron .bar { background: rgba(90, 220, 255, 0.14); border-radius: 0; }
-.menu.iron .fill { border-radius: 0; box-shadow: 0 0 6px currentColor; }
-.menu.iron .badge { background: #ff5a3d; border-radius: 2px; }
-.menu.iron .item.accent .tx, .menu.iron .check { color: #ffd166; }
-.menu.iron .foot { color: rgba(140, 220, 255, 0.6); border-color: rgba(90, 220, 255, 0.22); }
-.menu.iron .avatar { box-shadow: 0 0 0 1px rgba(90, 220, 255, 0.5), 0 0 12px rgba(90, 220, 255, 0.35); }
+.menu[data-theme="iron"] .item { border-radius: 2px; }
+.menu[data-theme="iron"] .item:hover, .menu[data-theme="iron"] .item.open { background: rgba(90, 220, 255, 0.13); box-shadow: inset 2px 0 0 #5ee0ff; }
+.menu[data-theme="iron"] .name { color: #ffd166; letter-spacing: 2.5px; font-size: 14px; }
+.menu[data-theme="iron"] .mood { color: #7fdfff; text-transform: uppercase; font-size: 10px; letter-spacing: 0.8px; }
+.menu[data-theme="iron"] .hint { color: rgba(140, 220, 255, 0.6); }
+.menu[data-theme="iron"] .sep { background: rgba(90, 220, 255, 0.22); }
+.menu[data-theme="iron"] .meters { border-color: rgba(90, 220, 255, 0.22); }
+.menu[data-theme="iron"] .bar { background: rgba(90, 220, 255, 0.14); border-radius: 0; }
+.menu[data-theme="iron"] .fill { border-radius: 0; box-shadow: 0 0 6px currentColor; }
+.menu[data-theme="iron"] .badge { background: #ff5a3d; border-radius: 2px; }
+.menu[data-theme="iron"] .item.accent .tx, .menu[data-theme="iron"] .check { color: #ffd166; }
+.menu[data-theme="iron"] .foot { color: rgba(140, 220, 255, 0.6); border-color: rgba(90, 220, 255, 0.22); }
+.menu[data-theme="iron"] .avatar { box-shadow: 0 0 0 1px rgba(90, 220, 255, 0.5), 0 0 12px rgba(90, 220, 255, 0.35); }
 
 /* ------------------------------------------------------------ reminder briefing */
 .brief {
@@ -152,7 +153,7 @@ html, body {
 .brief button.primary { background: #7a66ff; color: #fff; border-color: #7a66ff; flex: 1; }
 .brief button:hover { filter: brightness(1.08); }
 
-.brief[data-character="ironman"] {
+.brief[data-theme="iron"] {
   width: 380px; border-radius: 3px;
   background: linear-gradient(160deg, rgba(10, 28, 48, 0.95), rgba(3, 10, 20, 0.96));
   color: #e4f8ff; border: 1px solid rgba(90, 220, 255, 0.65);
@@ -161,24 +162,24 @@ html, body {
   animation: hudIn 0.45s ease-out;
   overflow: hidden;
 }
-.brief[data-character="ironman"]::before {
+.brief[data-theme="iron"]::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(0deg, rgba(120, 220, 255, 0.04) 0 1px, transparent 1px 3px),
               linear-gradient(180deg, transparent 0, rgba(120, 220, 255, 0.18) 50%, transparent 100%) 0 -120px / 100% 120px no-repeat;
   animation: scan 2.4s linear infinite;
 }
-.brief[data-character="ironman"]::after { display: none; }
+.brief[data-theme="iron"]::after { display: none; }
 @keyframes scan { to { background-position: 0 0, 0 260px; } }
 @keyframes hudIn { 0% { opacity: 0; clip-path: inset(50% 0 50% 0); } 60% { opacity: 1; } 100% { clip-path: inset(0 0 0 0); } }
-.brief[data-character="ironman"] .brief-head { color: #ffd166; letter-spacing: 4px; font-size: 12px; }
-.brief[data-character="ironman"] .brief-time { color: #7fdfff; letter-spacing: 1px; }
-.brief[data-character="ironman"] .brief-task { font-size: 20px; letter-spacing: 0.3px; text-shadow: 0 0 12px rgba(90, 220, 255, 0.45); }
-.brief[data-character="ironman"] .brief-quip { color: #9fe7ff; font-style: italic; }
-.brief[data-character="ironman"] button {
+.brief[data-theme="iron"] .brief-head { color: #ffd166; letter-spacing: 4px; font-size: 12px; }
+.brief[data-theme="iron"] .brief-time { color: #7fdfff; letter-spacing: 1px; }
+.brief[data-theme="iron"] .brief-task { font-size: 20px; letter-spacing: 0.3px; text-shadow: 0 0 12px rgba(90, 220, 255, 0.45); }
+.brief[data-theme="iron"] .brief-quip { color: #9fe7ff; font-style: italic; }
+.brief[data-theme="iron"] button {
   border-radius: 2px; border-color: rgba(90, 220, 255, 0.6); color: #8ff0ff; letter-spacing: 1px;
   font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px;
 }
-.brief[data-character="ironman"] button.primary { background: rgba(90, 220, 255, 0.2); color: #ffffff; border-color: #5ee0ff; box-shadow: 0 0 14px rgba(90, 220, 255, 0.35); }
+.brief[data-theme="iron"] button.primary { background: rgba(90, 220, 255, 0.2); color: #ffffff; border-color: #5ee0ff; box-shadow: 0 0 14px rgba(90, 220, 255, 0.35); }
 
 /* ------------------------------------------------------------ hero diagnostics card */
 .diag {

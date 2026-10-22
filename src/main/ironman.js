@@ -1,12 +1,17 @@
 'use strict';
 /*
- * Desktop Buddies — the armored hero ("Iron Man" style) world simulation.
+ * Desktop Buddies — the hero world simulation, and the armored hero
+ * ("Iron Man" style) who is the default hero.
  *
  * Side view: the hero stands on the floor (bottom of each screen's work area)
  * and has to fly to go anywhere higher. Enemies are deployed from the menu;
  * the hero fights them with repulsors, a two-hand blast, homing micro-missiles
  * and the chest beam. Enemies shoot back; at zero armor the suit goes offline
  * and reboots.
+ *
+ * Other heroes (heroes/*.js) subclass Hero and override movement, weapons and
+ * texts; HeroWorld runs whichever hero its `profile` names (enemies, armies,
+ * the nuke and allies are shared).
  *
  * Same public interface as the cat World (world.js) so main.js can switch.
  * Positions are global screen DIPs; hero (x, y) = point between the feet.
@@ -47,6 +52,39 @@ const QUIPS_WIN = ['Threat neutralized.', 'That was almost too easy.', 'Area sec
 
 const DEFAULT_IRON = { power: 100, armor: 100, missiles: 12 };
 
+// Lines the world says through the hero. A subclass overrides any of them:
+// a string, a list (one is picked) or a function of the arguments.
+const IRON_LINES = {
+  threat: 'THREAT DETECTED',
+  heavyThreat: 'WARNING: HEAVY UNIT',
+  victory: QUIPS_WIN,
+  bossDown: 'HEAVY UNIT DOWN',
+  bossBeam: 'INCOMING BEAM!',
+  locked: (label) => `TARGET LOCKED: ${label}`,
+  invasion: 'INCOMING!',
+  army: (total) => (total >= 1000 ? 'LEGENDARY BATTLE: 1000 HOSTILES' : `HOSTILE ARMY: ${total} UNITS`),
+  armyBoss: 'HEAVY MECH INBOUND',
+  milestone: (m, done) => (m === 1 ? `${done} DOWN. KEEP PUSHING!` : m === 2 ? 'HALFWAY THERE, LEGION!' : `${done}! THEY'RE BREAKING!`),
+  callAllies: 'CALLING THE LEGION',
+  allyReplace: 'REINFORCEMENTS, JARVIS',
+  allyDown: (callsign) => `${callsign} DOWN`,
+  armyWon: 'ARMY DEFEATED. GOOD WORK, LEGION.',
+  formUp: 'LEGION, FORM UP',
+  nukeStill: 'THEY\'RE STILL COMING!',
+  nukeClear: 'GROUND ZERO… CLEAR.',
+  thrown: ['WHOA—!', 'AAAH!', 'HANG ON—', 'TOO CLOSE!'],
+  recover: ['THAT WAS LOUD.', 'NOTE TO SELF: RUN FASTER.', 'STILL IN ONE PIECE.', 'EARS RINGING…'],
+  evacuate: 'NUKE INBOUND — EVACUATING!',
+  evacuateAlly: 'EVACUATING!',
+  brace: 'BRACE FOR IMPACT!',
+  armorLow: 'ARMOR CRITICAL',
+  allyArrive: (callsign) => `${callsign} REPORTING`,
+  allyLeave: ['GOOD HUNTING.', 'LEGION OUT.', 'CALL IF YOU NEED US.', 'RETURNING TO BASE.'],
+  greet: QUIPS_GREET,
+  poke: QUIPS_POKE,
+  held: QUIPS_HELD,
+};
+
 // ======================================================================= Hero
 class Hero {
   constructor(w, d, o) {
@@ -78,7 +116,13 @@ class Hero {
     this.speed = 0;
   }
 
-  get s() { return this.w.s; }
+  // hero scale: the world's size setting × how big this hero's body is
+  get s() { return this.w.s * this.constructor.BODY; }
+
+  line(key, ...a) {
+    const L = this.constructor.LINES[key] != null ? this.constructor.LINES[key] : IRON_LINES[key];
+    return typeof L === 'function' ? L(...a) : Array.isArray(L) ? pick(L) : L;
+  }
 
   say(text, tone) {
     if (this.w.settings.hudCallouts === false && tone !== 'warn') return;
@@ -127,17 +171,21 @@ class Hero {
     return true;
   }
 
-  tick(dt) {
-    this.dt = dt;
+  // power, armor & ammo over time
+  tickMeters(dt) {
     const w = this.w, s = this.s;
-    for (const k in this.cd) this.cd[k] = Math.max(0, this.cd[k] - dt);
-    // power & armor
     if (this.mode === 'air') this.power -= (this.speed > 250 * s ? 0.8 : 0.45) * dt;
     else if (this.mode === 'ground' && !this.aim && this.pose !== 'unibeam') this.power += (this.pose === 'walk' ? 1.2 : 3) * dt;
     if (!w.enemies.length && this.mode !== 'down') this.armor += (this.mode === 'ground' ? 1.4 : 0.5) * dt;
     if (w.now - (this.lastMissileAt || 0) > 6000 && this.missiles < 12) { this.missiles++; this.lastMissileAt = w.now; }
     this.power = clamp(this.power, 0, 100);
     this.armor = clamp(this.armor, 0, 100);
+  }
+
+  tick(dt) {
+    this.dt = dt;
+    for (const k in this.cd) this.cd[k] = Math.max(0, this.cd[k] - dt);
+    this.tickMeters(dt);
 
     const px = this.x, py = this.y;
     if (this.mode === 'held') { this.tickHeld(dt); return; }
@@ -577,7 +625,7 @@ class Hero {
     }
     if (byUser) {
       const recent = this.clicks.filter((t) => now() - t < 3000).length;
-      this.say(recent >= 4 ? pick(QUIPS_POKE) : pick(QUIPS_GREET), recent >= 4 ? 'warn' : null);
+      this.say(recent >= 4 ? this.line('poke') : this.line('greet'), recent >= 4 ? 'warn' : null);
       w.sound('hudBeep', this);
     }
     if (this.mode === 'air') yield* this.hoverFor(1.4); else yield* this.wait(1.4);
@@ -687,7 +735,7 @@ class Hero {
 
   * taskCombat() {
     const w = this.w, s = this.s;
-    this.say(w.enemies.some((e) => e.kind === 'boss') ? 'WARNING: HEAVY UNIT' : 'THREAT DETECTED', 'warn');
+    this.say(w.enemies.some((e) => e.kind === 'boss') ? this.line('heavyThreat') : this.line('threat'), 'warn');
     w.sound('alert', this);
     let engaged = 0;
     while (w.enemies.length) {
@@ -759,7 +807,7 @@ class Hero {
     }
     // victory
     if (this.ally) return;
-    this.say(pick(QUIPS_WIN));
+    this.say(this.line('victory'));
     if (this.mode === 'air') yield* this.land();
     this.setPose('thumbsUp');
     yield* this.wait(1.6);
@@ -791,7 +839,7 @@ class Hero {
     const n = w.nuke;
     if (!n) return;
     this.aim = null; this.charge = 0; this.beamK = 0;
-    this.say(this.ally ? 'EVACUATING!' : 'NUKE INBOUND — EVACUATING!', 'warn');
+    this.say(this.ally ? this.line('evacuateAlly') : this.line('evacuate'), 'warn');
     const spot = w.safeSpot(this);
     if (this.mode !== 'air') yield* this.takeOff(110);
     yield* this.flyTo(spot, { speed: 820, near: 26, timeout: 7, until: () => !w.nuke || w.nuke.detonated && w.nukeRadius() > dist(this.chest(), w.nuke) - 300 * s });
@@ -803,7 +851,7 @@ class Hero {
       if (this.y >= g - 6 * s) { this.y = g; this.vx = this.vy = 0; this.mode = 'ground'; }
     }
     this.setPose(this.mode === 'air' ? 'hover' : 'brace');
-    this.say('BRACE FOR IMPACT!', 'warn');
+    this.say(this.line('brace'), 'warn');
     while (w.nuke && !w.nuke.passed) {
       if (this.mode === 'air') this.steer(this.x, this.y, 60 * s);
       else this.setPose('brace');
@@ -825,7 +873,7 @@ class Hero {
     this.spinV = (vx >= 0 ? 1 : -1) * rand(9, 15);
     this.armor = Math.max(0, this.armor - dmg);
     this.hitAt = now();
-    this.say(pick(['WHOA—!', 'AAAH!', 'HANG ON—', 'TOO CLOSE!']), 'warn');
+    this.say(this.line('thrown'), 'warn');
   }
 
   tickThrown(dt) {
@@ -873,14 +921,14 @@ class Hero {
     this.setPose('crouch');
     yield* this.wait(0.45);
     this.setPose('stand');
-    this.say(pick(['THAT WAS LOUD.', 'NOTE TO SELF: RUN FASTER.', 'STILL IN ONE PIECE.', 'EARS RINGING…']));
+    this.say(this.line('recover'));
     yield* this.wait(0.6);
   }
 
   // ------------------------------------------------------------ Iron Legion (allies)
   * taskAllyArrive(target) {
     const s = this.s;
-    this.say(`${this.callsign} REPORTING`, 'radio');
+    this.say(this.line('allyArrive', this.callsign), 'radio');
     yield* this.flyTo(target, { speed: 620, near: 40, timeout: 5 });
   }
 
@@ -891,7 +939,7 @@ class Hero {
     if (this.mode !== 'air') yield* this.takeOff(120);
     this.faceTo(w.hero);
     this.setPose('salute');
-    this.say(pick(['GOOD HUNTING.', 'LEGION OUT.', 'CALL IF YOU NEED US.', 'RETURNING TO BASE.']), 'radio');
+    this.say(this.line('allyLeave'), 'radio');
     let t = 0;
     while (t < 1.3) { this.steer(this.x, this.y, 60 * s); this.setPose('salute'); t += this.dt; yield; }
     const d = w.geo.displayAt({ x: this.x, y: this.y - 40 * s }) || w.geo.primary;
@@ -910,7 +958,7 @@ class Hero {
     this.mode = 'held';
     this.setPose('held');
     this.swing = 0; this.swingV = 0;
-    this.say(pick(QUIPS_HELD));
+    this.say(this.line('held'));
   }
 
   tickHeld(dt) {
@@ -992,7 +1040,118 @@ class Hero {
     if (this.mode === 'air') return 'flying';
     return 'systems nominal';
   }
+
+  // ------------------------------------------------------------ what this hero offers the UI
+  // Bars for the menu, the hover card and the home window (v = 0..100).
+  meters() {
+    return [
+      { k: 'power', label: 'Arc reactor', short: 'PWR', icon: '⚡', v: this.power, color: '#4fd8ff' },
+      { k: 'armor', label: 'Armor', short: 'ARM', icon: '🛡️', v: this.armor, color: '#ffd166' },
+      { k: 'missiles', label: 'Missiles', short: 'MSL', icon: '🚀', v: (this.missiles / 12) * 100, color: '#ff7a6b' },
+    ];
+  }
+
+  // Hero-specific commands (the world handles enemies, armies, the nuke and quiet mode).
+  onCommand(name, at, a, free) {
+    const w = this.w, s = this.s;
+    switch (name) {
+      case 'attack':
+        if (free) this.interrupt(this.taskAttackAt(a.kind || 'repulsor', at), 'attack', 85);
+        break;
+      case 'takeoff': if (free && this.mode !== 'air') this.interrupt(this.taskHop(), 'hover', 50); break;
+      case 'land': if (free && this.mode === 'air') this.interrupt(this.land(), 'land', 50); break;
+      case 'flyTo':
+      case 'call':
+        if (free) this.interrupt((function* () { yield* this.flyTo(at, { speed: 480, near: 10 }); yield* this.hoverFor(1.2); yield* this.land(); }).call(this), 'flyTo', 50);
+        break;
+      case 'patrol': if (free) this.interrupt(this.taskPatrol(), 'patrol', 50); break;
+      case 'flyby': if (free) this.interrupt(this.taskFlyBy(), 'flyby', 50); break;
+      case 'scan': if (free) this.interrupt(this.taskScan(), 'scan', 50); break;
+      case 'diagnostics': if (free) this.interrupt(this.taskDiagnostics(), 'diag', 50); break;
+      case 'thumbsUp': if (free) this.interrupt(this.taskGreet(false), 'greet', 50); break;
+      case 'repair':
+        this.armor = 100; this.say('ARMOR RESTORED'); w.fx('repair', this.x, this.y - 50 * s, {}); w.sound('reboot', this);
+        break;
+      case 'recharge':
+        this.power = 100; this.missiles = 12; this.say('ARC REACTOR AT 100%'); w.fx('flash', this.x + this.facing * 2 * s, this.y - 65 * s, { size: 1.4 }); w.sound('chargeLong', this);
+        break;
+      default: return false;
+    }
+    return true;
+  }
+
+  // The hero part of the right-click menu (plain data; the overlay adds the common items).
+  menuItems() {
+    const h = this, w = this.w;
+    const air = h.mode === 'air';
+    return [
+      {
+        icon: '💥', label: 'Attack here',
+        sub: [
+          { icon: '✋', label: 'Repulsor blast', cmd: 'attack', args: { kind: 'repulsor' } },
+          { icon: '🚀', label: `Micro-missiles (${h.missiles})`, cmd: 'attack', args: { kind: 'missiles' }, disabled: h.missiles < 1 },
+          { icon: '🔆', label: 'Unibeam (arc reactor)', cmd: 'attack', args: { kind: 'unibeam' }, disabled: h.power < 20, hint: 'chest beam' },
+          { icon: '👐', label: 'Double hand blast', cmd: 'attack', args: { kind: 'blast' } },
+        ],
+      },
+      {
+        icon: '🛫', label: 'Flight',
+        sub: [
+          air ? { icon: '🛬', label: 'Land', cmd: 'land' } : { icon: '🛫', label: 'Take off & hover', cmd: 'takeoff' },
+          { icon: '📍', label: 'Fly here', cmd: 'flyTo' },
+          { icon: '🔄', label: 'Patrol the screens', cmd: 'patrol' },
+          { icon: '💨', label: 'Fly-by', cmd: 'flyby' },
+          { icon: '📡', label: 'Scan the area', cmd: 'scan' },
+        ],
+      },
+      {
+        icon: '🦾', label: 'Suit', badge: h.armor < 30 || h.power < 20 ? '!' : null,
+        sub: [
+          { icon: '🛠️', label: `Repair armor (${Math.round(h.armor)}%)`, cmd: 'repair' },
+          { icon: '⚡', label: `Recharge reactor (${Math.round(h.power)}%)`, cmd: 'recharge', hint: 'also reloads missiles' },
+          { icon: '👍', label: 'Thumbs up', cmd: 'thumbsUp' },
+          { icon: '🦾', label: w.allies.length ? `Dismiss the Legion (${w.allies.length})` : 'Call the Iron Legion', cmd: w.allies.length ? 'dismissAllies' : 'callAllies', args: { count: 3 } },
+          { icon: '🖥️', label: 'Run diagnostics', cmd: 'diagnostics', hint: 'CPU · memory · battery' },
+          '-',
+          ...[['classic', 'Classic red & gold'], ['stealth', 'Stealth'], ['silver', 'Silver prototype'], ['patriot', 'Patriot']].map(([k, l]) => ({ icon: '🎨', label: l, cmd: 'setting', args: { key: 'suit', value: k }, checked: w.settings.suit === k })),
+        ],
+      },
+    ];
+  }
+
+  // a few quick commands for the tray menu: [label, cmd, args]
+  trayItems() {
+    return [['Patrol the screens', 'patrol'], ['Repair & recharge', 'repair+recharge']];
+  }
+
+  // hero-specific fields for the renderer (merged into the hero snapshot)
+  snapExtra() { return null; }
+
+  serialize() { return { power: this.power, armor: this.armor, missiles: this.missiles, x: this.x, y: this.y }; }
 }
+
+// ---- class-level description of the armored hero (subclasses replace these)
+Hero.ID = 'ironman';
+Hero.NAME = 'Iron Man';
+Hero.BODY = 1;           // body size relative to the armored hero
+Hero.LINES = IRON_LINES;
+// home window: quick commands [icon, label, cmd, args], record [counter, label], guide [[title, html]]
+Hero.UI = {
+  title: 'MARK XLII',
+  quick: [['🔄', 'Patrol', 'patrol'], ['💨', 'Fly-by', 'flyby'], ['📡', 'Scan', 'scan'], ['🖥️', 'Diagnostics', 'diagnostics'], ['🛠️', 'Repair', 'repair'], ['⚡', 'Recharge', 'recharge'], ['🦾', 'Call Legion', 'callAllies', { count: 3 }], ['👋', 'Dismiss Legion', 'dismissAllies']],
+  stats: [['kills', 'threats down'], ['drones', 'drones'], ['walkers', 'walkers'], ['tanks', 'tanks'], ['bosses', 'heavy mechs'], ['armiesWon', 'armies beaten'], ['nukes', 'nukes dropped'], ['legion', 'legion suits called'], ['waves', 'waves cleared'], ['shotsFired', 'repulsor shots'], ['missiles', 'missiles fired'], ['reboots', 'suit reboots']],
+  looks: { key: 'suit', options: [['classic', 'Classic red & gold', 'linear-gradient(135deg,#c41f2a 55%,#f2b134 55%)'], ['stealth', 'Stealth', 'linear-gradient(135deg,#343843 55%,#9aa3b3 55%)'], ['silver', 'Silver prototype', 'linear-gradient(135deg,#b8bfca 55%,#e1e5eb 55%)'], ['patriot', 'Patriot', 'linear-gradient(135deg,#26408f 55%,#ffffff 55%)']] },
+  armyNote: (n, size) => (size === 'legendary' ? 'All 7 Iron Legion suits join, with replacements when one goes down. About 4 minutes of war.' : `Iron Man will call ${n} more suits from the Iron Legion.`),
+  help: [
+    ['🖱️ The menu', 'Right-click anywhere (or on Iron Man) for the suit menu. Tray icon and <b class="sc"></b> work too.'],
+    ['🎯 Enemies', '<i>Deploy enemy</i> drops a flying drone, ground walker, tank, drone swarm or a heavy mech exactly where you right-clicked. Iron Man engages automatically. Click an enemy to lock it as his priority target.'],
+    ['💥 Weapons', 'Repulsors (palm blasts), double hand blast for close range, homing micro-missiles from the shoulders, and the arc-reactor unibeam that cuts through a whole line. <i>Attack here</i> fires at the spot you right-clicked.'],
+    ['⚡ Power &amp; armor', 'Flying and weapons drain the arc reactor; standing on the ground recharges it. Missiles reload slowly. If armor hits zero the suit goes offline, falls, and reboots.'],
+    ['🛫 Flight', 'He lives on the floor of your screens — to go anywhere higher he has to fly. Drag him and let go: his thrusters catch him.'],
+    ['⚔ Army attack &amp; the Iron Legion', 'Pick a side and a size — up to a legendary 1000 attackers. Iron Man calls in up to 7 Iron Legion suits to fight with him; in epic battles a destroyed suit is replaced.'],
+    ['☢ Nuke', 'Siren, a falling bomb, then a mushroom cloud and a shockwave that wipes out every enemy on that screen. Iron Man runs for another screen — if the wave catches him, he goes flying.'],
+  ],
+};
 
 function segDist(p, a, b) {
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -1002,15 +1161,17 @@ function segDist(p, a, b) {
 }
 
 // ======================================================================= World
-class IronWorld {
-  constructor({ geo, data, settings, emit, sysinfo }) {
-    this.character = 'ironman';
+// Runs one hero (any Hero subclass) plus the shared enemies, armies, nuke and allies.
+class HeroWorld {
+  constructor({ geo, data, settings, emit, sysinfo, heroClass }) {
+    this.H = heroClass || Hero;
+    this.character = this.H.ID;
     this.geo = geo;
     this.emit = emit || (() => {});
     this.sysinfo = sysinfo || (() => ({}));
     this.settings = settings;
     this.counters = { kills: 0, drones: 0, walkers: 0, tanks: 0, bosses: 0, shotsFired: 0, missiles: 0, unibeams: 0, reboots: 0, waves: 0, nukes: 0, armies: 0, armiesWon: 0, legion: 0, ...((data && data.counters) || {}) };
-    this.hero = new Hero(this, data && data.hero);
+    this.hero = new this.H(this, data && data.hero);
     this.allies = [];
     this.nuke = null;
     this.army = null;
@@ -1033,7 +1194,7 @@ class IronWorld {
     this.placeOnScreen(!(data && data.hero && Number.isFinite(data.hero.x)));
   }
 
-  get s() { return SIZES[this.settings.ironSize] || 1; }
+  get s() { return SIZES[this.settings[this.H.SIZE_KEY]] || 1; }
   get diff() { return DIFF[this.settings.difficulty] || DIFF.normal; }
 
   dirty() { this.ver++; }
@@ -1178,7 +1339,7 @@ class IronWorld {
       this.counters[key] = (this.counters[key] || 0) + 1;
       this.fx('explosion', c.x, c.y, { size: e.kind === 'boss' ? 3 : e.kind === 'tank' ? 1.6 : e.kind === 'mini' ? 0.7 : 1 });
       this.sound(e.kind === 'boss' || e.kind === 'tank' ? 'boomBig' : 'boom', c);
-      if (e.kind === 'boss') this.say('HEAVY UNIT DOWN');
+      if (e.kind === 'boss') this.say(this.hero.line('bossDown'));
     } else {
       this.fx('portal', c.x, c.y, {});
     }
@@ -1198,7 +1359,7 @@ class IronWorld {
       if (h.ally) { this.destroyAlly(h); return; }
       this.counters.reboots++;
       h.run(h.taskReboot(), 'reboot', 99);
-    } else if (h.armor < 25 && !h.warnedArmor) { h.warnedArmor = true; h.say('ARMOR CRITICAL', 'warn'); }
+    } else if (h.armor < 25 && !h.warnedArmor) { h.warnedArmor = true; h.say(h.line('armorLow'), 'warn'); }
     if (h.armor > 40) h.warnedArmor = false;
   }
 
@@ -1225,6 +1386,13 @@ class IronWorld {
     const s = this.s, D = this.diff;
     for (const e of [...this.enemies]) {
       const k = ENEMY[e.kind];
+      if (e.grabbed) {
+        // a hero holds it and moves it every tick; if that stops, it drops
+        if (this.clock - (e.grabbedAt || 0) > 300) { e.grabbed = null; this.launchEnemy(e, 0, 0); }
+        continue;
+      }
+      if (e.launch) { this.tickLaunched(e, dt); continue; }
+      if (e.stun > 0) { this.tickStunned(e, dt); continue; }
       const h = this.nearestHero(e);
       const hc = h.chest();
       e.cool -= dt * D.rate;
@@ -1279,6 +1447,104 @@ class IronWorld {
     }
   }
 
+  // ---- shared moves heroes use on enemies
+  // stun: webbed / dazed for `sec` seconds (flyers sink to the floor); bosses shake it off faster
+  stunEnemy(e, sec, kind) {
+    if (!e || e.hp <= 0) return;
+    e.stun = Math.max(e.stun || 0, sec * (e.kind === 'boss' ? 0.35 : 1));
+    e.stunKind = kind || 'daze';
+    this.dirty();
+  }
+
+  tickStunned(e, dt) {
+    const s = this.s;
+    e.stun -= dt; e.charge = 0;
+    if (e.state === 'charging' || e.state === 'firing') { e.state = 'idle'; e.beam = null; e.cool = Math.max(e.cool, 1); }
+    const g = this.groundAt(e.x, e.y) - (e.air ? 14 * s : 0);
+    if (e.y < g - 0.5) {
+      e.vy = Math.min((e.vy || 0) + 900 * s * dt, 420 * s);
+      e.y = Math.min(g, e.y + e.vy * dt);
+      if (e.y >= g && !e.air) e.grounded = true;
+    } else { e.y = g; e.vy = 0; }
+    e.vx *= Math.exp(-4 * dt);
+    e.x = this.geo.clampWork({ x: e.x + e.vx * dt, y: e.y - 10 * s }, 20 * s).x;
+    if (e.stun <= 0) { e.stun = 0; e.stunKind = null; this.dirty(); }
+  }
+
+  // launch: knocked flying (a punch, a smash). o.thrown = { dmg, r } makes it a projectile that
+  // crashes into other enemies or the floor; o.dmg hurts it when it lands. Bosses barely move.
+  launchEnemy(e, vx, vy, o) {
+    if (!e || e.hp <= 0) return;
+    o = o || {};
+    const heavy = e.kind === 'boss' && !o.thrown ? 0.3 : 1;
+    e.grabbed = null;
+    e.launch = { t: 0, spinV: o.spin != null ? o.spin : (vx >= 0 ? 1 : -1) * rand(6, 12) * heavy, thrown: o.thrown || null, dmg: o.dmg || 0 };
+    e.vx = vx * heavy; e.vy = vy * heavy;
+    e.spin = e.spin || 0;
+    if (e.state === 'charging' || e.state === 'firing') { e.state = 'idle'; e.beam = null; }
+    this.dirty();
+  }
+
+  tickLaunched(e, dt) {
+    const s = this.s, L = e.launch;
+    L.t += dt;
+    e.vy += 1500 * s * dt;
+    e.x += e.vx * dt; e.y += e.vy * dt;
+    e.spin += L.spinV * dt;
+    const c = this.geo.clampBounds({ x: e.x, y: e.y - 10 * s }, 20 * s);
+    if (c.x !== e.x) { e.x = c.x; e.vx = -e.vx * 0.4; }
+    const d = this.geo.displayAt({ x: e.x, y: e.y }) || this.geo.nearestDisplay(e);
+    if (d && e.y < d.work.y + 20 * s) { e.y = d.work.y + 20 * s; e.vy = Math.abs(e.vy) * 0.3; }
+    if (L.thrown) {
+      const me = this.enemyCenter(e);
+      const hit = this.enemies.find((o) => o !== e && !o.launch && !o.grabbed && dist(this.enemyCenter(o), me) < (ENEMY[o.kind].r + ENEMY[e.kind].r) * s);
+      if (hit) { this.crash(e); return; }
+    }
+    const g = this.groundAt(e.x, e.y);
+    const rest = g - (e.air ? 14 * s : 0);
+    if (e.y >= rest || (e.air && !L.thrown && L.t > 0.7)) {
+      if (L.thrown) { e.y = Math.min(e.y, rest); this.crash(e); return; }
+      if (e.y >= rest) e.y = rest;
+      if (!e.air) { e.grounded = true; this.fx('shockwave', e.x, g, { size: e.kind === 'boss' ? 1.2 : 0.6 }); this.sound('landing', e); }
+      e.launch = null; e.spin = 0; e.vy = 0; e.vx *= 0.2;
+      if (L.dmg) this.damage(e, L.dmg, e);
+      this.dirty();
+    }
+  }
+
+  // a thrown enemy hits something: it and everything near it takes the damage
+  crash(e) {
+    const s = this.s, L = e.launch, T = L.thrown;
+    const c = this.enemyCenter(e);
+    e.launch = null; e.spin = 0; e.vx = 0; e.vy = 0;
+    if (!e.air) { e.y = this.groundAt(e.x, e.y); e.grounded = true; }
+    this.fx('explosion', c.x, c.y, { size: 1.3 });
+    this.sound('boomBig', c);
+    this.splash(c, (T.r || 80) * s, T.dmg || 6, e);
+    this.damage(e, T.dmg || 6, c);
+    this.dirty();
+  }
+
+  // area damage around p (optionally sparing one enemy)
+  splash(p, r, dmg, except) {
+    let n = 0;
+    for (const o of [...this.enemies]) {
+      if (o === except) continue;
+      if (dist(this.enemyCenter(o), p) < r + ENEMY[o.kind].r * this.s) { this.damage(o, dmg, p); n++; }
+    }
+    return n;
+  }
+
+  // grab: the hero holds the enemy (call every tick while holding it, then launch it)
+  holdEnemy(e, h, x, y) {
+    e.grabbed = h.id; e.grabbedAt = this.clock;
+    e.x = x; e.y = y; e.vx = h.vx; e.vy = h.vy;
+    e.stun = 0; e.charge = 0;
+    if (e.state === 'charging' || e.state === 'firing') { e.state = 'idle'; e.beam = null; }
+  }
+
+  count(key, n) { this.counters[key] = (this.counters[key] || 0) + (n == null ? 1 : n); }
+
   steerEnemy(e, want, maxSp, dt, accel) {
     const dx = want.x - e.x, dy = want.y - e.y, d = Math.hypot(dx, dy);
     const sp = Math.min(maxSp, d * 2);
@@ -1315,7 +1581,7 @@ class IronWorld {
     const s = this.s;
     const cannon = { x: e.x + e.facing * 52 * s, y: e.y - 62 * s };
     if (e.state === 'idle' && e.cool <= 0 && (who || this.hero).mode !== 'down') {
-      if (chance(0.55)) { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); this.say('INCOMING BEAM!', 'warn'); }
+      if (chance(0.55)) { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); this.say(this.hero.line('bossBeam'), 'warn'); }
       else {
         for (let i = 0; i < 3; i++) {
           this.addShot({ kind: 'emissile', owner: 'enemy', x: e.x + (i - 1) * 16 * s, y: e.y - 100 * s, vx: e.facing * 60 * s + (i - 1) * 60 * s, vy: -260 * s, target: 'hero', dmg: 9, life: 5, speed: 200 * s });
@@ -1337,7 +1603,7 @@ class IronWorld {
       e.beamTick = (e.beamTick || 0) + dt;
       if (e.beamTick > 0.2) {
         e.beamTick = 0;
-        for (const hh of this.heroes) { const c = hh.chest(); if (segDist(c, cannon, end) < 26 * s) this.hurtHero(2.4, c, hh); }
+        for (const hh of this.heroes) { const c = hh.chest(); if (segDist(c, cannon, end) < 26 * hh.s) this.hurtHero(2.4, c, hh); }
       }
       if (e.stateT >= 1.3) { e.state = 'idle'; e.charge = 0; e.cool = rand(2.6, 3.8); e.beam = null; }
     }
@@ -1368,24 +1634,29 @@ class IronWorld {
           p.vx = Math.cos(a) * p.speed; p.vy = Math.sin(a) * p.speed;
         } else { p.vy += 500 * s * dt; }
       }
-      if (p.kind === 'shell') p.vy += p.g * dt;
+      if (p.g) p.vy += p.g * dt;
       p.x += p.vx * dt; p.y += p.vy * dt;
       // hits
       if (p.owner !== 'enemy') {
-        for (const e of this.enemies) {
+        for (const e of [...this.enemies]) {
+          if (p.hit && p.hit[e.id]) continue;
           const c = this.enemyCenter(e);
-          if (dist(c, p) < (ENEMY[e.kind].r + 5) * s) {
+          if (dist(c, p) < (ENEMY[e.kind].r + (p.r || 5)) * s) {
             this.damage(e, p.dmg, p);
-            this.fx('explosion', p.x, p.y, { size: 0.55 });
-            this.sound('boom', p);
+            if (p.stun) this.stunEnemy(e, p.stun, p.stunKind);
+            if (p.knock && e.hp > 0) this.launchEnemy(e, Math.sign(p.vx || 1) * p.knock * s, -p.knock * 0.45 * s);
+            if (p.splash) this.splash(p, p.splash * s, p.splashDmg || p.dmg, e);
+            this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.55 });
+            this.sound(p.hitSound || 'boom', p);
+            if (p.pierce) { p.hit = p.hit || {}; p.hit[e.id] = 1; continue; }
             dead = true;
             break;
           }
         }
-        if (!dead && p.tp && dist(p, p.tp) < 14 * s) { this.fx('explosion', p.x, p.y, { size: 0.7 }); this.sound('boom', p); dead = true; }
+        if (!dead && p.tp && dist(p, p.tp) < 14 * s) { this.fx(p.hitFx || 'explosion', p.x, p.y, { size: 0.7 }); this.sound(p.hitSound || 'boom', p); if (p.splash) this.splash(p, p.splash * s, p.splashDmg || p.dmg); dead = true; }
       } else {
         for (const h of heroes) {
-          if (h.mode === 'down' || dist(p, h.chest()) >= 26 * s) continue;
+          if (h.mode === 'down' || dist(p, h.chest()) >= 26 * h.s) continue;
           this.hurtHero(p.dmg, p, h);
           if (p.kind !== 'laser') { this.fx('explosion', p.x, p.y, { size: 0.6 }); this.sound('boom', p); }
           dead = true;
@@ -1393,9 +1664,11 @@ class IronWorld {
         }
       }
       if (!dead && p.y >= this.groundAt(p.x, p.y) && p.kind !== 'laser') {
-        this.fx('explosion', p.x, p.y, { size: 0.6 });
-        this.sound('boom', p);
-        if (p.owner === 'enemy') for (const h of heroes) if (dist(p, { x: h.x, y: h.y - 30 * s }) < 50 * s) this.hurtHero(p.dmg * 0.5, p, h);
+        this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.6 });
+        this.sound(p.hitSound || 'boom', p);
+        if (p.owner === 'enemy') {
+          for (const h of heroes) if (dist(p, { x: h.x, y: h.y - 30 * s }) < 50 * s) this.hurtHero(p.dmg * 0.5, p, h);
+        } else if (p.splash) this.splash(p, p.splash * s, p.splashDmg || p.dmg);
         dead = true;
       }
       if (!dead && !this.geo.inAny(p, -40)) dead = true;
@@ -1417,7 +1690,7 @@ class IronWorld {
     const n = Math.floor(rand(2, 4));
     for (let i = 0; i < n; i++) this.spawn('drone', { x: d.work.x + rand(0.1, 0.9) * d.work.width, y: d.work.y + rand(0.12, 0.3) * d.work.height });
     if (chance(0.4)) this.spawn('walker', { x: d.work.x + (chance(0.5) ? 60 * s : d.work.width - 60 * s), y: d.work.y + d.work.height * 0.5 });
-    this.say('INCOMING!', 'warn');
+    this.say(this.hero.line('invasion'), 'warn');
   }
 
   // ------------------------------------------------------------ the nuke
@@ -1511,7 +1784,7 @@ class IronWorld {
     }
     if (!n.passed && r > n.rMax) {
       n.passed = true;
-      this.hero.say(this.enemies.length ? 'THEY\'RE STILL COMING!' : 'GROUND ZERO… CLEAR.');
+      this.hero.say(this.hero.line(this.enemies.length ? 'nukeStill' : 'nukeClear'));
     }
     if (t - n.det > 16000) { this.nuke = null; this.dirty(); }
   }
@@ -1534,12 +1807,12 @@ class IronWorld {
     // bosses arrive with the second half (spread through a huge army)
     if (bosses > 2) for (let b = 0; b < bosses; b++) queue.splice(Math.floor(queue.length * (0.08 + 0.9 * b / bosses)), 0, 'boss');
     else for (let b = 0; b < bosses; b++) queue.splice(Math.floor(queue.length * (0.45 + 0.4 * b)), 0, 'boss');
-    const legion = legionFor(total);
+    const legion = this.allyCount(total);
     const t = this.clock;
     const huge = total >= 200;
     this.army = { id: uid('a'), did: d.id, side, total, queue, spawned: 0, start: t, nextAt: t + 1400, legion, legionAt: t + 2200, called: 0, lastSide: 'left', huge, mark: 0 };
     this.counters.armies++;
-    this.hero.say(total >= 1000 ? 'LEGENDARY BATTLE: 1000 HOSTILES' : `HOSTILE ARMY: ${total} UNITS`, 'warn');
+    this.hero.say(this.hero.line('army', total), 'warn');
     this.sound('warHorn', { x: d.work.x + d.work.width / 2, y: d.work.y + 200 });
     this.dirty();
     return true;
@@ -1581,7 +1854,7 @@ class IronWorld {
           if (side !== 'top' && e.air) e.vx = (side === 'left' ? 1 : -1) * 260 * s;
           if (a.huge && kind !== 'boss') { e.hp *= 0.7; e.maxHp = e.hp; }
           if (i === 0 || kind === 'boss') this.fx('portal', e.x, this.enemyCenter(e).y, {});
-          if (kind === 'boss' && a.huge) this.hero.say('HEAVY MECH INBOUND', 'warn');
+          if (kind === 'boss' && a.huge) this.hero.say(this.hero.line('armyBoss'), 'warn');
         }
         a.spawned++;
       }
@@ -1593,42 +1866,50 @@ class IronWorld {
       const m = Math.floor((done / a.total) * 4);
       if (m > a.mark && m < 4) {
         a.mark = m;
-        this.hero.say(m === 1 ? `${done} DOWN. KEEP PUSHING!` : m === 2 ? 'HALFWAY THERE, LEGION!' : `${done}! THEY'RE BREAKING!`);
+        this.hero.say(this.hero.line('milestone', m, done));
         this.sound('hudBeep', this.hero);
       }
     }
-    // the main suit calls in the Iron Legion
+    // the hero calls in allies (the Iron Legion…)
     if (a.called < a.legion && t >= a.legionAt) {
-      if (a.called === 0) { this.hero.say('CALLING THE LEGION'); this.sound('hudBeep', this.hero); }
+      if (a.called === 0) { this.hero.say(this.hero.line('callAllies')); this.sound(this.H.ALLIES.callSound || 'hudBeep', this.hero); }
       this.spawnAlly(a);
       a.called++;
       a.legionAt = t + rand(350, 650);
     } else if (a.called >= a.legion && this.allies.length < a.legion && a.queue.length && t >= a.legionAt) {
       // a suit went down: send a replacement
-      if (this.spawnAlly(a)) this.hero.say('REINFORCEMENTS, JARVIS');
+      if (this.spawnAlly(a)) this.hero.say(this.hero.line('allyReplace'));
       a.legionAt = t + rand(6000, 9000);
     }
     if (!a.queue.length && !this.enemies.length && t - a.start > 3000) {
       this.counters.armiesWon++;
-      this.hero.say('ARMY DEFEATED. GOOD WORK, LEGION.');
+      this.hero.say(this.hero.line('armyWon'));
       this.sound('reboot', this.hero);
       this.army = null;
       this.dirty();
     }
   }
 
+  // how many allies answer the call for an army of `total` (0 for a hero who fights alone)
+  allyCount(total) {
+    const A = this.H.ALLIES;
+    return A ? Math.min(A.max || MAX_LEGION, legionFor(total)) : 0;
+  }
+
   spawnAlly(a, near) {
-    const geo = this.geo, s = this.s;
-    if (this.allies.length >= MAX_LEGION) return null;
+    const geo = this.geo, s = this.s, A = this.H.ALLIES;
+    if (!A || this.allies.length >= (A.max || MAX_LEGION)) return null;
     const d = (a && geo.displays.find((q) => q.id === a.did)) || geo.displayAt({ x: this.hero.x, y: this.hero.y - 40 * s }) || geo.primary;
-    const SUITS = ['silver', 'stealth', 'patriot', 'gold', 'midnight', 'arctic', 'gunmetal', 'classic'];
+    // A.looks: [[look, callsign|null], ...] — each ally wears a different look from the main hero
     const used = new Set(this.allies.map((x) => x.suit));
-    const suit = SUITS.find((k) => !used.has(k) && k !== this.settings.suit) || pick(SUITS);
-    const callsign = `MK-${pick(['II', 'XVII', 'XXI', 'XXXIII', 'XL', 'XXVI', 'XV', 'XXXV', 'XLVI'])}`;
+    const mine = this.settings[this.H.LOOK_KEY];
+    const look = A.looks.find((l) => !used.has(l[0]) && l[0] !== mine) || pick(A.looks);
+    const suit = look[0];
+    const callsign = look[1] || `MK-${pick(['II', 'XVII', 'XXI', 'XXXIII', 'XL', 'XXVI', 'XV', 'XXXV', 'XLVI'])}`;
     // they come in from the side opposite the enemy (or from the sky)
     const from = a && a.side === 'left' ? 'right' : a && a.side === 'right' ? 'left' : chance(0.5) ? 'left' : 'right';
     const x = from === 'left' ? d.work.x + rand(40, 140) * s : d.work.x + d.work.width - rand(40, 140) * s;
-    const h = new Hero(this, { power: 100, armor: 100, missiles: 12, x, y: d.work.y + 110 * s }, { id: uid('h'), ally: true, suit, callsign });
+    const h = new this.H(this, { power: 100, armor: 100, missiles: 12, x, y: d.work.y + 110 * s }, { id: uid('h'), ally: true, suit, callsign });
     h.mode = 'air';
     h.facing = from === 'left' ? 1 : -1;
     h.vx = h.facing * 300 * s; h.vy = 120 * s;
@@ -1636,8 +1917,8 @@ class IronWorld {
     h.run(h.taskAllyArrive(near || target), 'arrive', 70);
     this.allies.push(h);
     this.counters.legion++;
-    this.sound('thrustOn', h);
-    this.fx('flash', x, h.y - 50 * s, { size: 1, color: '120,225,255' });
+    this.sound(A.sound || 'thrustOn', h);
+    this.fx('flash', x, h.y - 50 * s, { size: 1, color: A.color || '120,225,255' });
     this.dirty();
     return h;
   }
@@ -1647,7 +1928,7 @@ class IronWorld {
     if (i < 0) return;
     this.allies.splice(i, 1);
     if (h.task) { try { h.task.return(); } catch (e) { /* */ } }
-    if (flyAway) this.fx('flash', h.x, h.y - 50 * this.s, { size: 0.8, color: '120,225,255' });
+    if (flyAway) this.fx('flash', h.x, h.y - 50 * this.s, { size: 0.8, color: (this.H.ALLIES && this.H.ALLIES.color) || '120,225,255' });
     this.dirty();
   }
 
@@ -1655,7 +1936,7 @@ class IronWorld {
     const c = h.chest();
     this.fx('explosion', c.x, c.y, { size: 1.3 });
     this.sound('boomBig', c);
-    this.hero.say(`${h.callsign} DOWN`, 'warn');
+    this.hero.say(this.hero.line('allyDown', h.callsign), 'warn');
     this.removeAlly(h);
     if (this.army) this.army.legionAt = Math.max(this.army.legionAt, this.clock + 5000);
   }
@@ -1675,7 +1956,8 @@ class IronWorld {
   cursorBusy() { return now() - this.cursorMovedAt < 1500; }
 
   heroBox() {
-    const h = this.hero, s = this.s;
+    const h = this.hero, s = h.s;
+    if (h.box) return h.box();
     if (h.mode === 'held') return { x: h.x - 20 * s, y: h.y - 104 * s, w: 40 * s, h: 104 * s };
     if (h.pose === 'fly') return { x: h.x - 50 * s, y: h.y - 78 * s, w: 100 * s, h: 50 * s };
     if (h.pose === 'down') return { x: h.x - 50 * s, y: h.y - 26 * s, w: 100 * s, h: 28 * s };
@@ -1710,7 +1992,7 @@ class IronWorld {
     const e = this.enemyAt(p);
     if (e) {
       this.lockId = e.id;
-      this.say(`TARGET LOCKED: ${ENEMY[e.kind].label}`);
+      this.say(this.hero.line('locked', ENEMY[e.kind].label));
       this.sound('lock', e);
       const h = this.hero;
       if (h.taskName !== 'combat' && h.mode !== 'down') h.interrupt(h.taskCombat(), 'combat', 80);
@@ -1727,7 +2009,7 @@ class IronWorld {
     h.clicks.push(now());
     h.clicks = h.clicks.filter((t) => now() - t < 4000);
     if (h.taskPrio <= 45) h.run(h.taskGreet(true), 'greet', 45);
-    else this.say(pick(QUIPS_GREET));
+    else this.say(h.line('greet'));
   }
 
   tickPress() {
@@ -1741,7 +2023,7 @@ class IronWorld {
 
   // ------------------------------------------------------------ commands
   command(name, a = {}) {
-    const h = this.hero, s = this.s;
+    const h = this.hero, s = h.s;
     const at = a.x != null ? { x: a.x, y: a.y } : { x: h.x + h.facing * 200 * s, y: h.y - 160 * s };
     const free = h.mode !== 'held' && h.mode !== 'down';
     switch (name) {
@@ -1755,26 +2037,6 @@ class IronWorld {
       case 'clearEnemies':
         for (const e of [...this.enemies]) this.kill(e, true);
         this.shots = []; this.beams = [];
-        break;
-      case 'attack':
-        if (free) h.interrupt(h.taskAttackAt(a.kind || 'repulsor', at), 'attack', 85);
-        break;
-      case 'takeoff': if (free && h.mode !== 'air') h.interrupt(h.taskHop(), 'hover', 50); break;
-      case 'land': if (free && h.mode === 'air') h.interrupt(h.land(), 'land', 50); break;
-      case 'flyTo':
-      case 'call':
-        if (free) h.interrupt((function* () { yield* h.flyTo(at, { speed: 480, near: 10 }); yield* h.hoverFor(1.2); yield* h.land(); }).call(h), 'flyTo', 50);
-        break;
-      case 'patrol': if (free) h.interrupt(h.taskPatrol(), 'patrol', 50); break;
-      case 'flyby': if (free) h.interrupt(h.taskFlyBy(), 'flyby', 50); break;
-      case 'scan': if (free) h.interrupt(h.taskScan(), 'scan', 50); break;
-      case 'diagnostics': if (free) h.interrupt(h.taskDiagnostics(), 'diag', 50); break;
-      case 'thumbsUp': if (free) h.interrupt(h.taskGreet(false), 'greet', 50); break;
-      case 'repair':
-        h.armor = 100; this.say('ARMOR RESTORED'); this.fx('repair', h.x, h.y - 50 * s, {}); this.sound('reboot', h);
-        break;
-      case 'recharge':
-        h.power = 100; h.missiles = 12; this.say('ARC REACTOR AT 100%'); this.fx('flash', h.x + h.facing * 2 * s, h.y - 65 * s, { size: 1.4 }); this.sound('chargeLong', h);
         break;
       case 'quiet':
         this.quiet = a.value != null ? !!a.value : !this.quiet;
@@ -1792,21 +2054,26 @@ class IronWorld {
         break;
       }
       case 'army': this.startArmy({ ...a, x: a.x != null ? a.x : null, y: a.y }); break;
+      case 'callAllies':
       case 'callLegion': {
-        const n = Math.max(1, Math.min(MAX_LEGION - this.allies.length, a.count || 3));
+        const A = this.H.ALLIES;
+        if (!A) break;
+        const n = Math.max(1, Math.min((A.max || MAX_LEGION) - this.allies.length, a.count || 3));
         const fake = { did: (this.geo.displayAt({ x: h.x, y: h.y - 40 * s }) || this.geo.primary).id, side: chance(0.5) ? 'left' : 'right' };
         for (let i = 0; i < n; i++) this.spawnAlly(fake);
-        this.say('LEGION, FORM UP');
+        this.say(h.line('formUp'));
         break;
       }
+      case 'dismissAllies':
       case 'dismissLegion': for (const x of [...this.allies]) x.run(x.taskAllyLeave(), 'leave', 75); break;
+      case 'repair+recharge': h.onCommand('repair', at, a, free); h.onCommand('recharge', at, a, free); break;
       case 'stopTool': break;
-      default: break;
+      default: h.onCommand(name, at, a, free); break;
     }
   }
 
   onSetting(key) {
-    if (key === 'ironSize') this.placeOnScreen(false);
+    if (key === this.H.SIZE_KEY) this.placeOnScreen(false);
   }
 
   activate() {
@@ -1876,7 +2143,7 @@ class IronWorld {
   }
 
   info() {
-    return { name: 'Iron Man', status: this.hero.statusText(), dead: false };
+    return { name: this.H.NAME, status: this.hero.statusText(), dead: false };
   }
 
   wall(tc) { return now() - (this.clock - tc); } // simulation time → wall-clock time
@@ -1887,7 +2154,8 @@ class IronWorld {
       x: h.x, y: h.y, vx: h.vx, vy: h.vy, facing: h.facing, mode: h.mode, pose: h.pose, poseStart: h.poseStart,
       aim: h.aim, aimArm: h.aimArm, charge: h.charge, beam: h.beamK, eyes: h.eyes, swing: h.swing, spin: h.spin, dist: h.dist, speed: h.speed,
       power: h.power, armor: h.armor, missiles: h.missiles, hitAt: h.hitAt, status: h.statusText(), task: h.taskName,
-      ground: this.groundAt(h.x, h.y),
+      ground: this.groundAt(h.x, h.y), body: this.H.BODY, meters: h.ally ? null : h.meters(),
+      ...(h.snapExtra() || {}),
     };
   }
 
@@ -1896,13 +2164,13 @@ class IronWorld {
     const t = now();
     const n = this.nuke, a = this.army;
     return {
-      t, s: this.s, character: 'ironman', ver: this.ver,
+      t, s: this.s, character: this.character, ver: this.ver,
       hero: this.heroSnap(h),
       allies: this.allies.map((x) => this.heroSnap(x)),
       nuke: n && { id: n.id, did: n.did, x: n.x, y: n.y, start: this.wall(n.start), det: this.wall(n.det), dropAt: this.wall(n.dropAt), speed: n.speed, rMax: n.rMax, detonated: n.detonated },
       army: a && { id: a.id, did: a.did, side: a.side, total: a.total, left: a.queue.length + this.enemies.length, legion: this.allies.length, start: this.wall(a.start) },
-      enemies: this.enemies.map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y, vx: e.vx, vy: e.vy, facing: e.facing, hp: e.hp, maxHp: e.maxHp, phase: e.phase, charge: e.charge, hitAt: e.hitAt, aim: e.aim, air: e.air, born: e.born })),
-      shots: this.shots.map((p) => ({ id: p.id, kind: p.kind, x: p.x, y: p.y, vx: p.vx, vy: p.vy, owner: p.owner })),
+      enemies: this.enemies.map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y, vx: e.vx, vy: e.vy, facing: e.facing, hp: e.hp, maxHp: e.maxHp, phase: e.phase, charge: e.charge, hitAt: e.hitAt, aim: e.aim, air: e.air, born: e.born, stun: e.stun || 0, stunKind: e.stunKind || null, spin: e.spin || 0, launch: !!e.launch, grabbed: !!e.grabbed })),
+      shots: this.shots.map((p) => ({ id: p.id, kind: p.kind, x: p.x, y: p.y, vx: p.vx, vy: p.vy, owner: p.owner, age: p.age, size: p.size || 1 })),
       beams: this.beams,
       hud: h.hud,
       diag: this.diag,
@@ -1914,17 +2182,27 @@ class IronWorld {
       quiet: this.quiet,
       sound: this.settings.sound, volume: this.settings.volume, voice: this.settings.voice !== false,
       suit: this.settings.suit || 'classic',
+      look: this.settings[this.H.LOOK_KEY] || null,
       ents: null,
     };
   }
 
+  // what each army size means for this hero (shown in the army dialogs)
+  armyNotes() {
+    return Object.fromEntries(Object.keys(ARMY_SIZES).map((k) => [k, this.H.UI.armyNote(this.allyCount(ARMY_SIZES[k]), k)]));
+  }
+
   homeState() {
-    const h = this.hero;
+    const h = this.hero, U = this.H.UI;
     return {
-      character: 'ironman',
+      character: this.character,
       army: !!this.army, nuke: !!this.nuke, allies: this.allies.length,
       displays: this.geo.displays.map((d, i) => ({ id: d.id, label: `Screen ${i + 1}${d.primary ? ' (main)' : ''}` })),
-      hero: { name: 'Iron Man', status: h.statusText(), power: h.power, armor: h.armor, missiles: h.missiles, mode: h.mode },
+      hero: { name: this.H.NAME, title: U.title, status: h.statusText(), power: h.power, armor: h.armor, missiles: h.missiles, mode: h.mode, meters: h.meters() },
+      ui: {
+        quick: U.quick, stats: U.stats, help: U.help, looks: U.looks || null, sizeKey: this.H.SIZE_KEY,
+        hasAllies: !!this.H.ALLIES, armyNotes: this.armyNotes(),
+      },
       enemies: this.enemies.length,
       counters: this.counters,
       settings: this.settings,
@@ -1933,9 +2211,43 @@ class IronWorld {
   }
 
   serialize() {
-    const h = this.hero;
-    return { hero: { power: h.power, armor: h.armor, missiles: h.missiles, x: h.x, y: h.y }, counters: this.counters, quiet: this.quiet };
+    return { hero: this.hero.serialize(), counters: this.counters, quiet: this.quiet };
   }
 }
 
-module.exports = { IronWorld, ENEMY, DEFAULT_IRON, SIZES };
+Hero.SIZE_KEY = 'ironSize';  // setting that sizes this hero
+Hero.LOOK_KEY = 'suit';      // setting that picks the look (suit colors)
+Hero.DEFAULTS = { suit: 'classic', ironSize: 'small' };
+Hero.WELCOME = 'Right-click Iron Man for the suit menu — deploy enemies, launch an army attack or set a reminder.';
+Hero.HOME = 'HQ';            // what the home window is called for this hero
+// how a reminder is delivered
+Hero.REMINDER = {
+  header: 'MISSION BRIEFING',
+  quips: [
+    'Clock\'s ticking. I\'d do it myself, but someone has to keep the skies safe.',
+    'Suit\'s ready. Are you? Let\'s get it done.',
+    'I ran the numbers. Yep — it\'s definitely time.',
+    'Priority one. Everything else can wait.',
+    'Consider this your official call to action.',
+    'No pressure. Just the fate of your to-do list.',
+    'Systems green. Go time.',
+    'Mission parameters are clear. Execute.',
+  ],
+  speech: (when, text, quip) => `Heads up. It's ${when}. ${text}. ${quip}`,
+  notify: (text) => `⏰ Mission: ${text}`,
+};
+// allies called in an army battle: looks [[look, callsign]] (callsign null = random MK-number)
+Hero.ALLIES = {
+  max: MAX_LEGION, color: '120,225,255',
+  looks: ['silver', 'stealth', 'patriot', 'gold', 'midnight', 'arctic', 'gunmetal', 'classic'].map((k) => [k, null]),
+};
+
+// the armored hero's world (what main.js and the tests used to construct)
+class IronWorld extends HeroWorld {
+  constructor(o) { super({ ...o, heroClass: Hero }); }
+}
+
+// helpers for hero subclasses (heroes/*.js)
+const util = { rand, chance, pick, clamp, lerp, dist, now, num, segDist, uid };
+
+module.exports = { HeroWorld, IronWorld, Hero, ENEMY, DEFAULT_IRON, SIZES, ARMY_SIZES, IRON_LINES, util };

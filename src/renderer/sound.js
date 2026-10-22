@@ -1,6 +1,8 @@
 /*
- * Desktop Cat — synthesized sounds (Web Audio, no audio files).
+ * Desktop Buddies — synthesized sounds (Web Audio, no audio files).
  * Meows use a sawtooth "voice" through formant filters with a pitch contour.
+ * Heroes add their own sounds: HeroArts[id].sounds = { name: (L) => … } where
+ * L gives the building blocks (blip, hiss, noise, gain, filt, curve, ctx, out).
  */
 (function (root) {
   'use strict';
@@ -240,6 +242,14 @@
     },
   };
 
+  // building blocks handed to the heroes' own sounds
+  const LIB = { blip, hiss, noise, gain, filt, curve, envelope, meow, ctx: () => ctx(), out: () => master };
+  function heroSound(name) {
+    const arts = root.HeroArts || {};
+    for (const k in arts) if (arts[k].sounds && arts[k].sounds[name]) return () => arts[k].sounds[name](LIB);
+    return null;
+  }
+
   // looping engine sounds (thrusters): level 0..1
   const loops = {};
   function setLoop(name, level) {
@@ -276,11 +286,12 @@
       const u = new root.SpeechSynthesisUtterance(text);
       const voices = synth.getVoices();
       const en = voices.filter((v) => /^en/i.test(v.lang));
-      const iron = character === 'ironman';
-      const prefer = iron ? /daniel|alex|aaron|arthur|david|guy|george|male|fred/i : /samantha|karen|zira|aria|female|victoria|moira|tessa/i;
-      u.voice = en.find((v) => prefer.test(v.name)) || en[0] || null;
-      u.pitch = iron ? 0.85 : 1.45;
-      u.rate = iron ? 1.02 : 1.05;
+      // each hero brings its voice: { prefer: /names/, pitch, rate }; the cat is high and quick
+      const art = character !== 'cat' && root.HeroArts && root.HeroArts[character];
+      const v = (art && art.voice) || { prefer: /samantha|karen|zira|aria|female|victoria|moira|tessa/i, pitch: 1.45, rate: 1.05 };
+      u.voice = en.find((x) => v.prefer.test(x.name)) || en[0] || null;
+      u.pitch = v.pitch;
+      u.rate = v.rate;
       u.volume = Math.min(1, volume * 1.6);
       synth.speak(u);
     } catch (e) { /* speech not available */ }
@@ -288,7 +299,7 @@
 
   function play(name) {
     if (!enabled || volume <= 0) return;
-    const fn = SFX[name];
+    const fn = SFX[name] || heroSound(name);
     if (!fn) return;
     try { fn(); } catch (e) { /* audio not available */ }
   }

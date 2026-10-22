@@ -1,5 +1,5 @@
 /*
- * Desktop Cat — overlay renderer (one per display).
+ * Desktop Buddies — overlay renderer (one per display).
  *
  * Draws the snapshot streamed from the main process. Every on-screen thing is
  * a small canvas "sprite" moved with CSS transforms and depth-sorted by its
@@ -30,6 +30,10 @@
     document.body.dataset.platform = d.platform;
   });
   let lastEnts = null, lastStateAt = 0, scene = 'cat', iron = null;
+  // the hero scene (ironScene.js) draws every hero; `scene` is the character id
+  const heroScene = () => scene !== 'cat' && !!iron;
+  const artOf = (ch) => (window.HeroArts && window.HeroArts[ch]) || null;
+  const themeOf = (ch) => (ch === 'cat' || !artOf(ch) ? 'cat' : artOf(ch).theme);
   const EMPTY_ENTS = { bowls: [], poops: [], scratches: [], files: [], yarns: [], boxes: [], posts: [], catnips: [], bed: null, grave: null };
   api.on('state', (s) => {
     lastStateAt = Date.now();
@@ -43,7 +47,7 @@
     const cfg = `${s.sound}|${s.volume}`;
     if (cfg !== soundCfg) { soundCfg = cfg; CatSound.configure(s.sound, s.volume); }
   });
-  api.on('fx', (e) => { if (scene === 'ironman' && iron && iron.expandFx(e, latest ? latest.s : 1)) return; spawnFx(e); });
+  api.on('fx', (e) => { if (heroScene() && iron.expandFx(e, latest ? latest.s : 1, scene)) return; spawnFx(e); });
   api.on('sound', (e) => CatSound.play(e.name));
   api.on('menu:open', (m) => CatMenu.open(m));
   api.on('menu:close', () => CatMenu.close(true));
@@ -579,7 +583,7 @@
   function ensureFx() {
     // big battles and the nuke fill the whole screen with soft effects every frame:
     // draw them at 1× so a Retina screen has a quarter of the pixels to push
-    const heavy = scene === 'ironman' && latest && (latest.army || latest.nuke);
+    const heavy = heroScene() && latest && (latest.army || latest.nuke);
     const d = heavy ? 1 : window.devicePixelRatio || 1;
     if (!fxCanvas) {
       fxCanvas = document.createElement('canvas');
@@ -614,7 +618,7 @@
     const mine = particles.filter((p) => !p.inCat && inB(p, 60));
     const showTool = tool && curHere && !(tool === 'mouse' && s.toyCaught);
     renderTool(showTool ? tool : null, cur, s, T, dt);
-    const ironFx = scene === 'ironman' && iron && iron.fxBusy(s);
+    const ironFx = heroScene() && iron.fxBusy(s);
     if (!mine.length && !ironFx) {
       if (fxWasDrawn && fxCtx) { fxCtx.setTransform(1, 0, 0, 1, 0, 0); fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height); fxWasDrawn = false; fxIdleSince = now; }
       if (fxCanvas && now - fxIdleSince > 3000) releaseFx();
@@ -663,10 +667,11 @@
     } else if (iron) iron.dispose();
     scene = ch;
     snaps = [];
-    if (ch === 'ironman' && !iron) {
+    if (ch !== 'cat' && !iron) {
       iron = IronScene.create({ Sprite, inB, spawn: spawnParticles, snaps: () => snaps, latest: () => latest, bounds: () => B, work: () => W, shake: applyShake });
     }
     document.body.dataset.character = ch;
+    document.body.dataset.theme = themeOf(ch);
   }
 
   // ---------------------------------------------------------------- shake (nuke shockwave)
@@ -694,7 +699,7 @@
   function renderBanner() {
     const s = latest;
     let html = null, kind = '';
-    if (scene === 'ironman' && iron) {
+    if (heroScene()) {
       const n = s.nuke;
       if (n && !n.detonated && inB(n)) {
         const left = Math.max(0, Math.ceil((n.det - Date.now()) / 1000));
@@ -706,7 +711,8 @@
           kind = 'army';
           const done = Math.max(0, a.total - a.left);
           const title = a.total >= 1000 ? 'LEGENDARY BATTLE' : a.total >= 200 ? 'EPIC BATTLE' : 'HOSTILE ARMY';
-          html = [`⚔ ${title} · ${a.left} LEFT`, `${done} / ${a.total} DESTROYED`, `IRON LEGION ×${a.legion}`, done / Math.max(1, a.total)];
+          const ally = artOf(scene) && artOf(scene).allyLabel;
+          html = [`⚔ ${title} · ${a.left} LEFT`, `${done} / ${a.total} DESTROYED`, ally && a.legion ? `${ally} ×${a.legion}` : '', done / Math.max(1, a.total)];
         }
       }
     }
@@ -742,14 +748,16 @@
   }
 
   // ---------------------------------------------------------------- army launch dialog (from the menu)
-  const dialog = { el: document.createElement('div'), open: false, at: null, side: 'right', size: 'medium', openedAt: 0 };
+  const dialog = { el: document.createElement('div'), open: false, at: null, side: 'right', size: 'medium', openedAt: 0, notes: null };
   dialog.el.className = 'brief armydlg';
-  dialog.el.dataset.character = 'ironman';
+  dialog.el.dataset.theme = 'iron';
   dialog.el.style.display = 'none';
   document.body.appendChild(dialog.el);
 
-  function openArmyDialog(origin) {
+  function openArmyDialog(origin, info) {
     dialog.open = true; dialog.at = origin; dialog.openedAt = Date.now();
+    dialog.notes = (info && info.armyNotes) || null;
+    dialog.el.dataset.theme = themeOf(scene);
     buildDialog();
     dialog.el.style.display = '';
     const w = dialog.el.offsetWidth, h = dialog.el.offsetHeight;
@@ -777,7 +785,7 @@
     group('SIZE', [['small', '10'], ['medium', '20'], ['large', '35'], ['massive', '50']], 'size');
     group('EPIC BATTLES', [['epic', '200 · EPIC'], ['legendary', '1000 · LEGENDARY']], 'size');
     const legion = { small: 2, medium: 3, large: 5 }[dialog.size] || 7;
-    el.appendChild(txt('div', 'brief-quip', dialog.size === 'legendary'
+    el.appendChild(txt('div', 'brief-quip', dialog.notes ? dialog.notes[dialog.size] || '' : dialog.size === 'legendary'
       ? 'All 7 suits of the Iron Legion join the fight, and replacements fly in when one goes down. About 4 minutes of war.'
       : dialog.size === 'epic' ? 'All 7 suits of the Iron Legion join the fight. Heavy mechs in every wave.'
         : `Iron Man will call ${legion} more suits from the Iron Legion.`));
@@ -789,7 +797,7 @@
     row.appendChild(go); row.appendChild(cancel);
     el.appendChild(row);
   }
-  CatMenu.onLocal = (name, origin) => { if (name === 'army') openArmyDialog(origin); };
+  CatMenu.onLocal = (name, origin, info) => { if (name === 'army') openArmyDialog(origin, info); };
 
   // all clickable overlay panels report their rectangles to main (so only they catch the mouse)
   let hudKey = '';
@@ -821,9 +829,12 @@
   function buildPanel(a) {
     const el = panel.el;
     el.innerHTML = '';
-    el.dataset.character = a.character || scene;
+    const ch = a.character || scene;
+    const words = ch !== 'cat' && artOf(ch) ? artOf(ch).brief : null;
+    el.dataset.character = ch;
+    el.dataset.theme = themeOf(ch);
     el.appendChild(txt('div', 'brief-head', a.header || 'Reminder'));
-    if (a.character === 'ironman') el.appendChild(txt('div', 'brief-time', `T-MINUS 0 · ${a.time}`));
+    if (words && words.time) el.appendChild(txt('div', 'brief-time', words.time(a)));
     el.appendChild(txt('div', 'brief-task', a.text));
     el.appendChild(txt('div', 'brief-quip', a.quip || ''));
     const row = txt('div', 'brief-btns');
@@ -832,10 +843,9 @@
       b.addEventListener('click', (e) => { e.stopPropagation(); api.send('cmd', { name: cmd, args: { id: a.id, ...(args || {}) } }); });
       row.appendChild(b);
     };
-    const ironStyle = a.character === 'ironman';
-    btn(ironStyle ? 'ACKNOWLEDGED' : 'Done ✓', 'reminderDone', null, true);
-    btn(ironStyle ? 'SNOOZE 5' : 'Snooze 5 min', 'reminderSnooze', { minutes: 5 });
-    btn(ironStyle ? 'SNOOZE 15' : '15 min', 'reminderSnooze', { minutes: 15 });
+    btn(words ? words.done : 'Done ✓', 'reminderDone', null, true);
+    btn(words ? words.snooze(5) : 'Snooze 5 min', 'reminderSnooze', { minutes: 5 });
+    btn(words ? words.snooze(15) : '15 min', 'reminderSnooze', { minutes: 15 });
     el.appendChild(row);
   }
 
@@ -850,7 +860,7 @@
       if (ready) {
         const S = s.s;
         let ax, ay;
-        if (scene === 'ironman' && s.hero) { ax = s.hero.x; ay = s.hero.y - 120 * S; }
+        if (heroScene() && s.hero) { ax = s.hero.x; ay = s.hero.y - 120 * S * (s.hero.body || 1); }
         else if (s.cat) { ax = s.cat.x; ay = s.cat.y - 95 * S; }
         if (!a.arrived && wa) { ax = wa.x + wa.width / 2; ay = wa.y + wa.height * 0.62 - 110 * S; }
         if (ax != null && inB({ x: ax, y: ay })) {
@@ -864,7 +874,8 @@
           reportHud();
           if (panel.spokeFor !== panel.id) {
             panel.spokeFor = panel.id;
-            CatSound.play(scene === 'ironman' ? 'alert' : 'reminder');
+            const words = heroScene() && artOf(scene) ? artOf(scene).brief : null;
+            CatSound.play(words ? words.sound || 'alert' : 'reminder');
             if (s.voice) setTimeout(() => CatSound.speak(a.speech || a.text, a.character || scene), 600);
           }
         }
@@ -874,11 +885,11 @@
       panel.el.style.display = 'none';
       reportHud();
     }
-    if (dialog.open && (scene !== 'ironman' || Date.now() - dialog.openedAt > 60000)) closeArmyDialog();
+    if (dialog.open && (!heroScene() || Date.now() - dialog.openedAt > 60000)) closeArmyDialog();
     renderBanner();
     // hero diagnostics card, follows the hero
     let dshow = false;
-    if (scene === 'ironman' && s.diag && s.hero) {
+    if (heroScene() && s.diag && s.hero) {
       const S = s.s, h = s.hero;
       const ax = h.x + h.facing * 40 * S, ay = h.y - 100 * S;
       if (inB({ x: ax, y: ay })) {
@@ -913,7 +924,7 @@
   function busyHere() {
     const s = latest;
     if (panel.el.style.display !== 'none' || diag.el.style.display !== 'none' || dialog.open || banner.el.style.display !== 'none') return true;
-    if (scene === 'ironman') return particles.some((p) => inB(p, 60)) || iron.busyHere(s);
+    if (heroScene()) return particles.some((p) => inB(p, 60)) || iron.busyHere(s);
     const c = s.cat, S = s.s;
     if (inB({ x: c.x, y: c.y - c.z }, 160 * S)) return true;
     if (c.dead && c.ghost && inB(c.ghost, 200 * S)) return true;
@@ -926,7 +937,7 @@
     const s = latest, c = s.cat;
     if (document.hidden || Date.now() - lastStateAt > 2000) return 2; // hidden / paused: don't draw
     if (!busyHere()) return 3;
-    if (scene === 'ironman') return Math.max(iron.wantFps(s), particles.some((p) => inB(p, 60)) ? 60 : 0, panel.el.style.display !== 'none' ? 30 : 0);
+    if (heroScene()) return Math.max(iron.wantFps(s), particles.some((p) => inB(p, 60)) ? 60 : 0, panel.el.style.display !== 'none' ? 30 : 0);
     if (s.announce) return 30;
     if ((s.tool && inB(s.cursor, 60)) || c.mode !== 'task' || c.speed > 120 || c.pose === 'pounce' || c.pose === 'run') return 60;
     let fps = c.dead ? (c.ghost && Date.now() - c.ghost.start < 7000 ? 40 : 4) : c.sleeping ? 8 : 12;
@@ -956,7 +967,7 @@
     const now = Date.now();
     const T = now / 1000;
     try {
-      if (scene === 'ironman') iron.render(latest, now, T, dt);
+      if (heroScene()) iron.render(latest, now, T, dt);
       else { renderEntities(now, T); renderCat(now, T, dt); }
       renderFx(now, T, dt);
       renderPanels(now);

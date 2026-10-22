@@ -1251,5 +1251,20 @@
     SUITS, POSES, makeRig, lerpRig, drawHero, points, drawEnemy, ENEMIES,
     drawBeam, drawLaser, drawMissile, drawShell, FX, hudText, reticle, glow, drawBust,
     drawBomb, drawNukeTarget, drawMushroom, drawShockwave, drawDustWall, drawScorch, trefoil,
+    // shared rig helpers for the other heroes (heroes/*.js)
+    rig: { base, resolve, ik, reachTo, limbPath, limb, grad, flame, lerpAng, THIGH, SHIN, UPPER, FORE },
+  };
+
+  // the armored hero as one of the heroes (see ironScene.js for what a hero art provides)
+  root.HeroArts = root.HeroArts || {};
+  root.HeroArts.ironman = {
+    name: 'IRON MAN', theme: 'iron', looks: SUITS, lookKey: 'suit',
+    makeRig, lerpRig, drawHero, points, drawBust,
+    cardTitle: (h) => (h.ally ? h.callsign : 'MK-XLII'),
+    loop: 'thrust',
+    allyLabel: 'IRON LEGION',
+    brief: { done: 'ACKNOWLEDGED', snooze: (m) => `SNOOZE ${m}`, time: (a) => `T-MINUS 0 · ${a.time}`, sound: 'alert' },
+    voice: { prefer: /daniel|alex|aaron|arthur|david|guy|george|male|fred/i, pitch: 0.85, rate: 1.02 },
+    menuName: (s) => `MK-XLII · ${s.hero.status}`,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,0 +1,106 @@
+/* Desktop Buddies — menu & reminder-panel themes for Homelander, Hulk and Spider-Man
+   (Iron Man's HUD theme lives in overlay.css). */
+
+/* ------------------------------------------------------------ Homelander: Vought corporate */
+.menu[data-theme="vought"], .brief[data-theme="vought"] {
+  background: linear-gradient(165deg, rgba(14, 30, 70, 0.97), rgba(6, 14, 36, 0.98));
+  color: #f4f1e6;
+  border: 1px solid rgba(212, 175, 55, 0.75);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.15), 0 0 24px rgba(212, 175, 55, 0.18), 0 14px 40px rgba(0, 0, 0, 0.55);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+}
+.menu[data-theme="vought"] { border-radius: 6px; }
+.menu[data-theme="vought"]::after, .brief[data-theme="vought"]::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; border-radius: 6px 6px 0 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, #b22234 0 10px, #ffffff 10px 20px);
+}
+.menu[data-theme="vought"] .item { border-radius: 4px; }
+.menu[data-theme="vought"] .item:hover, .menu[data-theme="vought"] .item.open { background: rgba(212, 175, 55, 0.14); }
+.menu[data-theme="vought"] .name { color: #e8c75a; letter-spacing: 3px; font-weight: 800; font-size: 14px; text-transform: uppercase; }
+.menu[data-theme="vought"] .mood { color: #b9c6e8; font-size: 11px; }
+.menu[data-theme="vought"] .hint { color: rgba(220, 210, 170, 0.6); }
+.menu[data-theme="vought"] .sep { background: rgba(212, 175, 55, 0.25); }
+.menu[data-theme="vought"] .meters, .menu[data-theme="vought"] .foot { border-color: rgba(212, 175, 55, 0.25); }
+.menu[data-theme="vought"] .bar { background: rgba(212, 175, 55, 0.15); }
+.menu[data-theme="vought"] .badge { background: #b22234; }
+.menu[data-theme="vought"] .item.accent .tx, .menu[data-theme="vought"] .check { color: #e8c75a; }
+.menu[data-theme="vought"] .foot { color: rgba(220, 210, 170, 0.6); }
+.menu[data-theme="vought"] .item.danger .tx { color: #ff6b6b; }
+.menu[data-theme="vought"] .avatar { box-shadow: 0 0 0 2px #d4af37, 0 0 10px rgba(212, 175, 55, 0.4); }
+.brief[data-theme="vought"] { width: 370px; border-radius: 8px; overflow: hidden; }
+.brief[data-theme="vought"]::after { display: none; }
+.brief[data-theme="vought"] .brief-head { color: #e8c75a; letter-spacing: 3px; font-size: 12px; text-transform: uppercase; }
+.brief[data-theme="vought"] .brief-time { color: #b9c6e8; }
+.brief[data-theme="vought"] .brief-task { color: #ffffff; }
+.brief[data-theme="vought"] .brief-quip { color: #d9cfa8; font-style: italic; }
+.brief[data-theme="vought"] button { border-radius: 4px; border-color: rgba(212, 175, 55, 0.6); color: #e8c75a; }
+.brief[data-theme="vought"] button.primary { background: #b22234; color: #ffffff; border-color: #d4af37; }
+.armydlg[data-theme="vought"] .dlg-label { color: #e8c75a; }
+.armydlg[data-theme="vought"] .dlg-row button.on { background: rgba(212, 175, 55, 0.25); color: #fff; border-color: #d4af37; box-shadow: none; }
+
+/* ------------------------------------------------------------ Hulk: gamma */
+.menu[data-theme="gamma"], .brief[data-theme="gamma"] {
+  background: radial-gradient(120% 90% at 20% 0%, rgba(40, 90, 30, 0.97), rgba(10, 22, 10, 0.98) 70%);
+  color: #eaffdf;
+  border: 2px solid #4f9d2a;
+  box-shadow: 0 0 0 1px rgba(124, 255, 79, 0.18), 0 0 26px rgba(124, 255, 79, 0.25), 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.menu[data-theme="gamma"] { border-radius: 10px; }
+.menu[data-theme="gamma"] .item { border-radius: 7px; }
+.menu[data-theme="gamma"] .item:hover, .menu[data-theme="gamma"] .item.open { background: rgba(124, 255, 79, 0.14); }
+.menu[data-theme="gamma"] .name { color: #8dff5a; font: 900 17px Impact, Haettenschweiler, "Arial Black", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; text-shadow: 2px 2px 0 #2c4a14; }
+.menu[data-theme="gamma"] .mood { color: #c7a8ff; font-size: 11px; }
+.menu[data-theme="gamma"] .hint { color: rgba(200, 255, 180, 0.55); }
+.menu[data-theme="gamma"] .sep { background: rgba(124, 255, 79, 0.22); }
+.menu[data-theme="gamma"] .meters, .menu[data-theme="gamma"] .foot { border-color: rgba(124, 255, 79, 0.22); }
+.menu[data-theme="gamma"] .bar { background: rgba(124, 255, 79, 0.14); }
+.menu[data-theme="gamma"] .badge { background: #7b3fa0; }
+.menu[data-theme="gamma"] .item.accent .tx, .menu[data-theme="gamma"] .check { color: #8dff5a; }
+.menu[data-theme="gamma"] .foot { color: rgba(200, 255, 180, 0.55); }
+.menu[data-theme="gamma"] .item.danger .tx { color: #ff7a6b; }
+.menu[data-theme="gamma"] .avatar { box-shadow: 0 0 0 2px #4f9d2a, 0 0 12px rgba(124, 255, 79, 0.45); }
+.brief[data-theme="gamma"] { width: 360px; border-radius: 14px; }
+.brief[data-theme="gamma"]::after { border-color: #4f9d2a; background: rgba(14, 30, 12, 0.98); }
+.brief[data-theme="gamma"] .brief-head { color: #8dff5a; font: 900 18px Impact, Haettenschweiler, "Arial Black", sans-serif; letter-spacing: 1px; text-transform: uppercase; text-shadow: 2px 2px 0 #2c4a14; }
+.brief[data-theme="gamma"] .brief-time { color: #c7a8ff; }
+.brief[data-theme="gamma"] .brief-task { color: #ffffff; }
+.brief[data-theme="gamma"] .brief-quip { color: #c9f0b8; font-weight: 700; }
+.brief[data-theme="gamma"] button { border-radius: 10px; border-color: rgba(124, 255, 79, 0.55); color: #8dff5a; font-weight: 800; }
+.brief[data-theme="gamma"] button.primary { background: #4f9d2a; color: #ffffff; border-color: #8dff5a; }
+.armydlg[data-theme="gamma"] .dlg-label { color: #8dff5a; }
+.armydlg[data-theme="gamma"] .dlg-row button.on { background: rgba(124, 255, 79, 0.25); color: #fff; border-color: #8dff5a; box-shadow: none; }
+
+/* ------------------------------------------------------------ Spider-Man: web */
+.menu[data-theme="spider"], .brief[data-theme="spider"] {
+  background:
+    repeating-radial-gradient(circle at 0 0, transparent 0 22px, rgba(255, 255, 255, 0.05) 22px 23px),
+    repeating-conic-gradient(from 0deg at 0 0, transparent 0 7deg, rgba(255, 255, 255, 0.05) 7deg 7.6deg),
+    linear-gradient(160deg, rgba(150, 18, 28, 0.97), rgba(24, 34, 92, 0.98));
+  color: #ffffff;
+  border: 2px solid #0e1430;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.menu[data-theme="spider"] { border-radius: 12px; }
+.menu[data-theme="spider"] .item { border-radius: 8px; }
+.menu[data-theme="spider"] .item:hover, .menu[data-theme="spider"] .item.open { background: rgba(255, 255, 255, 0.14); }
+.menu[data-theme="spider"] .name { font: italic 900 16px "Segoe UI", system-ui, sans-serif; letter-spacing: 1px; text-transform: uppercase; text-shadow: 1.5px 1.5px 0 #0e1430; }
+.menu[data-theme="spider"] .mood { color: #ffd9dc; font-size: 11px; }
+.menu[data-theme="spider"] .hint { color: rgba(255, 230, 232, 0.6); }
+.menu[data-theme="spider"] .sep { background: rgba(255, 255, 255, 0.2); }
+.menu[data-theme="spider"] .meters, .menu[data-theme="spider"] .foot { border-color: rgba(255, 255, 255, 0.2); }
+.menu[data-theme="spider"] .bar { background: rgba(255, 255, 255, 0.16); }
+.menu[data-theme="spider"] .badge { background: #ffffff; color: #c4161f; }
+.menu[data-theme="spider"] .item.accent .tx, .menu[data-theme="spider"] .check { color: #9fd4ff; }
+.menu[data-theme="spider"] .foot { color: rgba(255, 230, 232, 0.6); }
+.menu[data-theme="spider"] .item.danger .tx { color: #ffb3b8; }
+.menu[data-theme="spider"] .avatar { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0e1430; }
+.brief[data-theme="spider"] { width: 360px; border-radius: 16px; }
+.brief[data-theme="spider"]::after { background: rgba(24, 34, 92, 0.98); border-color: #0e1430; }
+.brief[data-theme="spider"] .brief-head { font: italic 900 15px "Segoe UI", system-ui, sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #ffffff; text-shadow: 1.5px 1.5px 0 #0e1430; }
+.brief[data-theme="spider"] .brief-time { color: #ffd9dc; }
+.brief[data-theme="spider"] .brief-task { color: #ffffff; }
+.brief[data-theme="spider"] .brief-quip { color: #e3e8ff; font-style: italic; }
+.brief[data-theme="spider"] button { border-radius: 20px; border-color: rgba(255, 255, 255, 0.6); color: #ffffff; }
+.brief[data-theme="spider"] button.primary { background: #ffffff; color: #c4161f; border-color: #ffffff; }
+.armydlg[data-theme="spider"] .dlg-label { color: #ffd9dc; }
+.armydlg[data-theme="spider"] .dlg-row button.on { background: rgba(255, 255, 255, 0.3); color: #fff; border-color: #fff; box-shadow: none; }

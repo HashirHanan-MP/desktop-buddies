@@ -1,6 +1,6 @@
 # Builds every edition for Windows, macOS and Linux on their native runners:
 # the full Desktop Buddies (all characters) and one app per character —
-# Desktop Cat, Desktop Homelander, Desktop Hulk and Desktop Spider-Man.
+# Desktop Cat, Desktop Iron Man, Desktop Homelander, Desktop Hulk and Desktop Spider-Man.
 # Push a tag like v3.0.0 (or run it manually) and download the installers
 # from the workflow run's "Artifacts" section.
 name: build
@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        edition: [all, cat, homelander, hulk, spiderman]
+        edition: [all, cat, ironman, homelander, hulk, spiderman]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

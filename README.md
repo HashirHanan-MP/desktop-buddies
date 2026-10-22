@@ -25,16 +25,17 @@ icon and save, so you can install any of them (or several side by side):
 
 | App | Character | Build |
 |---|---|---|
-| **Desktop Cat** | the cat | `node scripts/build-editions.js cat` |
+| **Desktop Cat** | its own ginger tabby, with levels, outfits, focus timer, feather wand & gifts | `node scripts/build-editions.js cat` |
+| **Desktop Iron Man** | Iron Man — Mark III, Mark 50 nanotech or the Hulkbuster | `node scripts/build-editions.js ironman` |
 | **Desktop Homelander** | Homelander | `node scripts/build-editions.js homelander` |
 | **Desktop Hulk** | Hulk | `node scripts/build-editions.js hulk` |
 | **Desktop Spider-Man** | Spider-Man | `node scripts/build-editions.js spiderman` |
 | **Desktop Buddies** | all five, switch from the menu | `node scripts/build-editions.js all` |
 
-`npm run editions` builds the four single-character apps for the current OS
+`npm run editions` builds the five single-character apps for the current OS
 (add `--win`, `--mac` or `--linux`, and `--x64` to skip arm64). Installers land in
 `dist/<edition>/`. To try one without building: `npm run start:hulk` (or
-`start:cat`, `start:homelander`, `start:spiderman`) — each keeps its own save.
+`start:cat`, `start:ironman`, `start:homelander`, `start:spiderman`) — each keeps its own save.
 
 ## 🐱 The cat
 
@@ -48,16 +49,28 @@ icon and save, so you can install any of them (or several side by side):
 | **Mischief** | Scratches the screen and drags pretend files around. Fix with the repair spray and *Tidy up files*. |
 | **More** | Laser, yarn, box, catnip, brush, petting & purring, slow blinks, zoomies, moods and thought bubbles. |
 
+## 🧡 Desktop Cat (the standalone cat app)
+
+Desktop Cat is its own app with its own look — not the all-in-one's white cat:
+
+| | |
+|---|---|
+| **The cat** | A ginger tabby (stripes, white bib, socks and muzzle) wearing a red collar with a golden bell that jingles as it trots. Other coats: tuxedo, calico, siamese, grey tabby. Warm "cozy" menus and Cat Home, its own logo and tray icon. |
+| **Bond level** | Meals, petting, play, cleaning up and focusing earn bond points. Every level unlocks an outfit — bow tie, bandana, flower crown, party hat, glasses, scarf, crown (*Dress up* in the menu, or the Wardrobe in Cat Home). |
+| **Focus timer** | 15 / 25 / 50 minutes: the cat naps quietly in the corner with a little tomato timer above it (its needs pause), then comes over to say it's break time — take a break or focus 25 more. |
+| **Feather wand** | *Play → Feather wand*: a feather dangles from your cursor; hold it above the cat and it leaps straight up to grab it. |
+| **Gifts** | A happy, well-loved cat sometimes goes exploring and brings you a present — a feather, a leaf, a sock, a bottle cap… Click it to keep it on the Gift shelf. |
+
 ## 🦾 Iron Man
 
 | | |
 |---|---|
 | **On the ground** | He stands and walks (heavy metal steps) on the bottom of each screen. To go anywhere higher he has to **fly**: crouch, take off, hover, cruise in the classic flight pose, and finish with a superhero landing. |
-| **Enemies** | Right-click → *Deploy enemy* drops a **flying drone**, **ground walker**, **tank**, **drone swarm** or a **heavy mech boss** exactly where you clicked. Ground units fall to the floor; flyers swarm around him. They shoot back (lasers, arcing shells, homing missiles, a charging beam). |
+| **Enemies** | Right-click → *Deploy enemy* drops one of **Ultron's army** — a flying **Ultron sentry**, an **Ultron soldier**, an **Ultron heavy** or a **swarm** of Ultron drones — or a villain boss: **Thanos** (Infinity Gauntlet beam, a ground slam up close, hurled rocks), **Doctor Doom** (flies; homing mystic bolts, a lightning beam, a force field that soaks hits), **Kang the Conqueror** (steps through time portals; chrono-bolt bursts and a heavy time blast) or the towering **Galactus**, who looms at the edge of the screen with sweeping Power Cosmic eye beams, homing cosmic orbs and a stomp that shakes the floor. Ground units fall to the floor; flyers swarm around him. Every hero fights all of them. |
 | **Weapons** | **Repulsor** palm blasts, **double hand blast** at close range, homing **micro-missiles** from the shoulders, the **unibeam** from the arc reactor (cuts through a whole line), and a punch when they get too close. He also dodges incoming fire. |
 | **Attack here** | Right-click any spot → *Attack here* → fire that weapon at it. Click an enemy to lock it as the priority target. |
 | **☢ Nuke** | Right-click → *Drop a nuke here* (or HQ → *Nuke*, per screen). An air-raid siren wails, a laser marks ground zero, and the bomb whistles down onto the floor of that screen. Then a white flash, a ground-burst fireball that climbs into a mushroom cloud with a condensation ring, and a shockwave that sweeps the **whole screen** — every enemy on it is destroyed — and rolls on into your other screens. Iron Man (and the Legion) race to the far side of another screen; when the wave catches them they're **thrown** through the air, tumble, crash and get back up. |
-| **⚔ Army attack** | Right-click → *Army attack…* (or HQ → *Army attack*): choose where they come from (left, right, the sky or both sides) and how many: 10, 20, 35, 50, or the **epic** battles — **200** and **1000 (legendary)**. Heavy mechs march in with the later waves. A banner tracks how many are left. |
+| **⚔ Army attack** | Right-click → *Army attack…* (or HQ → *Army attack*): choose where they come from (left, right, the sky or both sides) and how many: 10, 20, 35, 50, or the **epic** battles — **200** and **1000 (legendary)**. Ultron's legions fill the waves, Thanos, Doctor Doom and Kang lead the later ones, and the legendary battle ends with **Galactus**. A banner tracks how many are left. |
 | **🦾 Iron Legion** | When an army arrives Iron Man calls in other suits — 2 for a small army, up to **7** for a big one — each in its own colors with a callsign (MK-XVII, MK-XL…). They fly in, take their own positions and fight alongside him; in an epic battle a destroyed suit is replaced. When the army is beaten they salute and fly home. You can also *Call / Dismiss the Legion* from the Suit menu. |
 | **Power & armor** | Flying and weapons drain the arc reactor, standing on the floor recharges it, missiles reload over time. At zero armor the suit goes **offline**, falls and **reboots**. Menu → *Suit* → repair / recharge. |
 | **More** | Patrols, fly-bys, area scans, **diagnostics** (your real CPU, memory, battery, uptime in a HUD card), thumbs-up, eight suit colors, random invasions (off by default), difficulty, stand-by mode. Drag him and let go — his thrusters catch him. |

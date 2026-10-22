@@ -14,7 +14,7 @@
  * Meters: power = stamina, armor = health, rage = rage. He fights alone.
  */
 const { Hero, ENEMY, util } = require('../ironman');
-const { rand, chance, pick, clamp, dist, num } = util;
+const { rand, chance, pick, clamp, dist, num, isBoss } = util;
 
 const LEAP_G = 2600;   // gravity during leaps (× s)
 const WALK = 46, RUN = 125;
@@ -316,7 +316,7 @@ class HulkHero extends Hero {
       w.damage(e, dmg * k * this.mult(), { x, y: g });
       if (e.hp > 0) {
         w.stunEnemy(e, stun, 'daze');
-        if (e.kind !== 'boss' && e.kind !== 'tank') w.launchEnemy(e, Math.sign(e.x - x || 1) * 160 * ws, -380 * ws * k);
+        if (!isBoss(e) && e.kind !== 'tank') w.launchEnemy(e, Math.sign(e.x - x || 1) * 160 * ws, -380 * ws * k);
       }
       n++;
     }
@@ -369,7 +369,7 @@ class HulkHero extends Hero {
       if (e.hp <= 0) continue;
       w.stunEnemy(e, 2.6 * k + 0.6, 'daze');
       const a = Math.atan2(c.y - o.y, c.x - o.x);
-      if (e.kind !== 'boss') w.launchEnemy(e, Math.cos(a) * 520 * ws * k, Math.sin(a) * 420 * ws * k - 120 * ws);
+      if (!isBoss(e)) w.launchEnemy(e, Math.cos(a) * 520 * ws * k, Math.sin(a) * 420 * ws * k - 120 * ws);
     }
     for (const p of [...w.shots]) if (p.owner === 'enemy' && dist(p, o) < 260 * s) w.shots.splice(w.shots.indexOf(p), 1);
     w.sound('hulkClap', this);
@@ -709,7 +709,7 @@ class HulkHero extends Hero {
     const w = this.w;
     if (this.mode === 'air') yield* this.land();
     if (this.form === 'banner') { this.form = 'hulk'; w.fx('gamma', this.x, this.y - 40 * this.s, { size: this.s }); }
-    this.say(w.enemies.some((e) => e.kind === 'boss') ? this.line('heavyThreat') : this.line('threat'), 'warn');
+    this.say(w.enemies.some(isBoss) ? this.line('heavyThreat') : this.line('threat'), 'warn');
     w.sound('hulkGrunt', this);
     if (this.cd.roar <= 0 && chance(0.35)) yield* this.roar(false);
     while (w.enemies.length) {
@@ -1055,13 +1055,13 @@ HulkHero.REMINDER = {
 HulkHero.UI = {
   title: 'STRONGEST THERE IS',
   quick: [['🦘', 'Leap around', 'patrol'], ['👊', 'Smash', 'attack', { kind: 'smash' }], ['👏', 'Thunderclap', 'attack', { kind: 'clap' }], ['🪨', 'Boulder', 'attack', { kind: 'boulder' }], ['😡', 'Roar', 'roar'], ['💪', 'Flex', 'flex'], ['🧘', 'Calm down', 'calm'], ['❤️', 'Heal', 'repair']],
-  stats: [['kills', 'robots smashed'], ['drones', 'drones'], ['walkers', 'walkers'], ['tanks', 'tanks'], ['bosses', 'heavy mechs'], ['armiesWon', 'armies beaten'], ['smashes', 'ground smashes'], ['claps', 'thunderclaps'], ['throws', 'robots thrown'], ['boulders', 'boulders thrown'], ['leaps', 'leaps'], ['reboots', 'knockouts']],
+  stats: [['kills', 'robots smashed'], ['drones', 'Ultron drones'], ['walkers', 'Ultron soldiers'], ['tanks', 'Ultron heavies'], ['bosses', 'villains smashed'], ['thanos', 'Thanos'], ['doom', 'Doctor Doom'], ['kang', 'Kang'], ['galactus', 'Galactus'], ['armiesWon', 'armies beaten'], ['smashes', 'ground smashes'], ['claps', 'thunderclaps'], ['throws', 'robots thrown'], ['boulders', 'boulders thrown'], ['leaps', 'leaps'], ['reboots', 'knockouts']],
   looks: { key: 'hulkSkin', options: SKINS },
-  armyNote: (n, size) => (size === 'legendary' ? 'Hulk fights all 1000 alone. His rage maxes out — about 5 minutes of smashing.'
-    : size === 'epic' ? 'Hulk fights 200 robots alone. Heavy mechs in every wave.' : 'Hulk fights alone. More robots, more rage.'),
+  armyNote: (n, size) => (size === 'legendary' ? 'Hulk fights all 1000 alone — and then Galactus. His rage maxes out: about 5 minutes of smashing.'
+    : size === 'epic' ? 'Hulk fights 200 Ultrons alone. Thanos, Doom and Kang lead the waves.' : 'Hulk fights alone. More robots, more rage.'),
   help: [
     ['🖱️ The menu', 'Right-click anywhere (or on Hulk) for the smash menu. The tray icon and <b class="sc"></b> work too.'],
-    ['🎯 Robots to smash', '<i>Deploy enemy</i> drops a drone, walker, tank, drone swarm or a heavy mech where you right-clicked. Hulk charges in on his own. Click an enemy to make it his next target.'],
+    ['🎯 Robots to smash', '<i>Deploy enemy</i> drops Ultron\'s robots (sentry, soldier, heavy, swarm) or a supervillain — Thanos, Doctor Doom, Kang, or the giant Galactus — where you right-clicked. Hulk charges in on his own. Click an enemy to make it his next target.'],
     ['👊 Smashing', 'Punches send robots flying, the ground smash shakes the whole floor, the thunderclap blows flyers out of the sky, he rips up chunks of floor to throw, and he hurls tanks into other tanks. <i>Smash here</i> aims at the spot you right-clicked.'],
     ['🦘 Leaping', 'Hulk can\'t fly — he lives on the floor of your screens and leaps everywhere else, landing with a smash. Drag him and let go: he drops and smashes the floor.'],
     ['😡 Rage', 'Fighting and getting hurt make him angrier, and angrier means stronger. At full rage he goes on a rampage. <i>Calm down</i> cools him off. He heals fast; if he\'s knocked out he turns back into Bruce Banner for a moment…'],

@@ -48,11 +48,11 @@ step(sec(60)); // idle life
 assert(tasks.hop || tasks.visit || tasks.stroll, 'he moves around when idle');
 
 // every enemy type, one at a time — including flyers he has to leap at
-for (const kind of ['drone', 'walker', 'tank', 'swarm', 'boss']) {
+for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
   const d = geo.displays[kind === 'tank' ? 1 : 0];
   w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });
   let t = 0;
-  while (w.enemies.length && t < sec(90)) { step(1); t++; if (h.armor < 30) h.armor = 80; }
+  while (w.enemies.length && t < sec(kind === 'galactus' ? 180 : 90)) { step(1); t++; if (h.armor < 30) h.armor = 80; }
   console.log(`${kind}: cleared=${!w.enemies.length} in ${(t / 60).toFixed(1)}s, kills=${w.counters.kills}, stamina=${h.power.toFixed(0)}, rage=${h.rage.toFixed(0)}, health=${h.armor.toFixed(0)}`);
   assert(!w.enemies.length, `${kind} not defeated`);
   step(sec(4));

@@ -39,7 +39,7 @@ const PRELOAD = path.join(__dirname, '..', 'preload.js');
 const EDITION = editionFor(process.env.BUDDY_EDITION || (process.argv.find((a) => a.startsWith('--edition=')) || '').slice(10) || readPkg().edition);
 const CHARACTERS = EDITION.characters;
 const ICON = fs.existsSync(path.join(ROOT, 'build', EDITION.icon)) ? path.join(ROOT, 'build', EDITION.icon) : path.join(ROOT, 'build', 'icon.png');
-const trayIconFile = (ch) => path.join(ROOT, 'build', `tray-${ch}.png`);
+const trayIconFile = (ch) => path.join(ROOT, 'build', (EDITION.trays && EDITION.trays[ch]) || `tray-${ch}.png`);
 const MENU_SHORTCUT = 'CommandOrControl+Alt+Shift+K';
 const APP_NAME = EDITION.appName;
 
@@ -60,6 +60,7 @@ const ALL_DEFAULTS = {
   difficulty: 'normal',
   hudCallouts: true,
   ...Object.assign({}, ...Object.values(HEROES).map((H) => H.DEFAULTS)),
+  ...(EDITION.defaults || {}),
 };
 
 // A desktop pet needs free window placement, always-on-top and the global cursor
@@ -126,10 +127,17 @@ function init() {
   const v2 = data && data.version === 2;
   settings = { ...ALL_DEFAULTS, ...((v2 ? data.settings : data && data.settings) || {}) };
   if (!worldsKnown(settings.character)) settings.character = CHARACTERS[0];
+  if (EDITION.catExtras && settings.catLook !== 1) {
+    // first run of the new Desktop Cat (or an update from the plain-cat version): the tabby look
+    settings.catLook = 1;
+    Object.assign(settings, EDITION.defaults);
+    const saved = v2 ? data.cat && data.cat.cat : data && data.cat;
+    if (saved) saved.palette = EDITION.defaults.palette;
+  }
   geo = new Geo();
   geo.set(displayList());
   for (const ch of CHARACTERS) {
-    if (ch === 'cat') worlds.cat = new World({ geo, data: v2 ? data.cat : data, settings, desktopItems: cachedDesktopItems, emit: (e) => onWorldEvent(e, 'cat') });
+    if (ch === 'cat') worlds.cat = new World({ geo, data: v2 ? data.cat : data, settings, desktopItems: cachedDesktopItems, emit: (e) => onWorldEvent(e, 'cat'), extras: !!EDITION.catExtras });
     else worlds[ch] = new HeroWorld({ geo, heroClass: HEROES[ch], data: v2 ? data[ch] : null, settings, emit: (e) => onWorldEvent(e, ch), sysinfo: () => sysinfo.info() });
   }
   world = worlds[settings.character];
@@ -495,7 +503,25 @@ function onWorldEvent(e, from) {
     if (Notification.isSupported()) {
       try { new Notification({ title: e.title, body: e.body, icon: fs.existsSync(ICON) ? ICON : undefined, silent: false }).show(); } catch (err) { /* ignore */ }
     }
+  } else if (e.type === 'focusDone') {
+    onFocusDone(e);
   }
+}
+
+// Desktop Cat's focus timer ran out: the cat comes to the middle of the screen with a break
+const BREAK_QUIPS = ['Break time — come play with me!', 'Stretch your legs. I already did.', 'Good work! Now a treat… for me?', 'Five minutes off. Cat\'s orders.'];
+function onFocusDone(e) {
+  const quip = BREAK_QUIPS[Math.floor(Math.random() * BREAK_QUIPS.length)];
+  const when = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const ann = {
+    id: '__focus', text: `${e.minutes} minutes of focus — done!`, time: when, character: 'cat',
+    header: '🍅 Focus session complete', quip,
+    speech: `${e.minutes} minutes of focus. Done! ${quip}`,
+    buttons: [['Take a break ✓', 'reminderDone', null, true], ['Focus 25 more', 'focus', { minutes: 25 }]],
+  };
+  if (world.hidden) setHidden(false);
+  world.announce(ann);
+  onWorldEvent({ type: 'notify', title: '🍅 Focus session complete', body: `${e.minutes} minutes done. ${quip}` });
 }
 
 function save() {
@@ -695,13 +721,13 @@ function handleCmd(name, args) {
     case 'reminderUpdate': reminders.update(args.id, args.patch); save(); break;
     case 'reminderRemove': if (world.announcement && world.announcement.id === args.id) world.clearAnnouncement(args.id); reminders.remove(args.id); save(); break;
     case 'reminderTest': { const r = reminders.list.find((x) => x.id === args.id); if (r) onReminder({ id: '__test', text: r.text, time: r.time }); break; }
-    case 'reminderDone': if (args.id === '__test') world.clearAnnouncement('__test'); else resolveReminder(args.id, 'done'); break;
-    case 'reminderSnooze': if (args.id === '__test') world.clearAnnouncement('__test'); else resolveReminder(args.id, 'snooze', args.minutes || 5); break;
+    case 'reminderDone': if (args.id === '__test' || args.id === '__focus') world.clearAnnouncement(args.id); else resolveReminder(args.id, 'done'); break;
+    case 'reminderSnooze': if (args.id === '__test' || args.id === '__focus') world.clearAnnouncement(args.id); else resolveReminder(args.id, 'snooze', args.minutes || 5); break;
     default:
       world.command(name, args);
   }
   trayDirty = true;
-  if (['rename', 'setting', 'adopt', 'resetCat', 'quiet', 'character'].includes(name)) save();
+  if (['rename', 'setting', 'adopt', 'resetCat', 'quiet', 'character', 'wear'].includes(name)) save();
 }
 
 function setHidden(h) {
@@ -765,7 +791,7 @@ function openHome(tab) {
     width: 500, height: 780, minWidth: 440, minHeight: 560,
     title: APP_NAME,
     show: false,
-    backgroundColor: isHero(settings.character) ? '#0b0f1a' : '#f7f5fc',
+    backgroundColor: isHero(settings.character) ? '#0b0f1a' : EDITION.catExtras ? '#fff7ec' : '#f7f5fc',
     autoHideMenuBar: true,
     icon: fs.existsSync(ICON) ? ICON : undefined,
     ...(isMac ? { titleBarStyle: 'hiddenInset' } : {}),
@@ -826,7 +852,7 @@ function updateTrayMenuIfNeeded() {
   ];
   if (hero) {
     tpl.push(
-      { label: 'Deploy enemy', submenu: [['Flying drone', 'drone'], ['Ground walker', 'walker'], ['Tank', 'tank'], ['Drone swarm', 'swarm'], ['Heavy mech (boss)', 'boss']].map(([l, k]) => ({ label: l, click: () => handleCmd('spawn', { kind: k, ...cur() }) })) },
+      { label: 'Deploy enemy', submenu: [['Ultron sentry', 'drone'], ['Ultron soldier', 'walker'], ['Ultron heavy', 'tank'], ['Ultron swarm', 'swarm'], ['Thanos (boss)', 'thanos'], ['Doctor Doom (boss)', 'doom'], ['Kang the Conqueror (boss)', 'kang'], ['Galactus (giant boss)', 'galactus']].map(([l, k]) => ({ label: l, click: () => handleCmd('spawn', { kind: k, ...cur() }) })) },
       ...world.hero.trayItems().map(([l, c, a]) => ({ label: l, click: () => handleCmd(c, a) })),
     );
   } else if (!inf.dead) {

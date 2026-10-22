@@ -21,7 +21,8 @@
     ['🐭', 'Mouse', 'toyMouse', null, 'mouse'], ['🔴', 'Laser', 'laser', null, 'laser'], ['🧶', 'Yarn', 'yarn'], ['📦', 'Box', 'box'],
     ['✨', 'Clean all', 'cleanAll'], ['🧴', 'Fix all', 'fixAll'], ['🗂️', 'Tidy files', 'tidyFiles'], ['👋', 'Call', 'call'],
   ];
-  const ENEMIES = [['🛸', 'Drone', 'drone'], ['🤖', 'Walker', 'walker'], ['🛞', 'Tank', 'tank'], ['🐝', 'Swarm', 'swarm'], ['👾', 'Boss', 'boss'], ['🧹', 'Clear', null]];
+  // Ultron's army, the villains (bosses), and clear-all
+  const ENEMIES = [['🛸', 'Ultron sentry', 'drone'], ['🤖', 'Ultron soldier', 'walker'], ['🦾', 'Ultron heavy', 'tank'], ['🐝', 'Ultron swarm', 'swarm'], ['💎', 'Thanos', 'thanos'], ['🟢', 'Doctor Doom', 'doom'], ['⏳', 'Kang', 'kang'], ['🪐', 'Galactus', 'galactus'], ['🧹', 'Clear', null]];
   const STATS = [['meals', 'meals eaten'], ['treats', 'treats'], ['pets', 'pets'], ['poopsCleaned', 'poops scooped'], ['scratchesFixed', 'scratches fixed'], ['filesTidied', 'files tidied'], ['miceCaught', 'mice caught'], ['laserPounces', 'laser pounces'], ['naps', 'naps']];
   const FUR = { white: '#ffffff', cream: '#f6e3c6', silver: '#c9cdd8', ginger: '#f5a65b', black: '#34353f' };
   const EYES = { blue: '#6cb6ff', green: '#8bd06a', amber: '#f3b443', odd: 'linear-gradient(90deg,#6cb6ff 50%,#f3b443 50%)' };
@@ -99,6 +100,86 @@
     }
   }
   swatches($('#fur'), FUR, 'palette');
+
+  // ------------------------------------------------------------ Desktop Cat extras (bond level, focus, outfits, gifts)
+  let extrasBuilt = false, wardKey = '', giftKey = '';
+  function buildExtras() {
+    extrasBuilt = true;
+    // its own coats instead of the classic white-cat colors
+    if (window.CatArt && CatArt.COATS) {
+      $('#fur').innerHTML = '';
+      swatches($('#fur'), Object.fromEntries(CatArt.COATS.map(([k, , css]) => [k, css])), 'palette', (k) => (CatArt.COATS.find((x) => x[0] === k) || [k, k])[1]);
+    }
+    quick($('#quick'), [['🪶', 'Feather', 'feather', null, 'feather'], ['🍅', 'Focus 25', 'focus', { minutes: 25 }]]);
+    stats($('#stats'), [['feathersCaught', 'feathers caught'], ['gifts', 'gifts received'], ['focusMinutes', 'minutes focused']]);
+    const fb = $('#focusBtns');
+    for (const m of [15, 25, 50]) {
+      const b = el('button', 'btn small', `${m} min`);
+      b.addEventListener('click', () => cmd('focus', { minutes: m }));
+      fb.appendChild(b);
+    }
+    const stop = el('button', 'btn small warn', 'Stop');
+    stop.id = 'focusStop';
+    stop.addEventListener('click', () => cmd('focusStop'));
+    fb.appendChild(stop);
+  }
+
+  function applyExtras(s) {
+    if (!extrasBuilt) buildExtras();
+    const P = s.progress || { level: 1, xp: 0, need: 60 };
+    $('#bondLevel').textContent = `Bond level ${P.level}`;
+    $('#bondFill').style.width = Math.round((P.xp / P.need) * 100) + '%';
+    const next = (s.wardrobe || []).find((x) => !x.unlocked);
+    $('#bondNext').textContent = next ? `${Math.round(P.need - P.xp)} XP to level ${P.level + 1} · next outfit: ${next.label}` : `${Math.round(P.need - P.xp)} XP to level ${P.level + 1} · every outfit unlocked`;
+    const f = s.focus;
+    $('#focusText').textContent = f
+      ? `Focusing… ${Math.max(1, Math.ceil((f.until - Date.now()) / 60000))} of ${f.minutes} minutes left. ${s.cat.name} is napping in the corner.`
+      : `${s.cat.name} naps in the corner while you work, then tells you when it's break time. ${(s.counters.focusMinutes || 0).toLocaleString()} minutes so far.`;
+    $$('#focusBtns button').forEach((b) => { b.style.display = (b.id === 'focusStop') === !!f ? '' : 'none'; });
+    // wardrobe: every outfit, locked ones greyed out
+    const wk = JSON.stringify(s.wardrobe) + s.settings.palette;
+    if (wk !== wardKey) {
+      wardKey = wk;
+      const box = $('#wardrobe');
+      box.innerHTML = '';
+      for (const it of [{ k: 'none', label: 'No outfit', level: 1, unlocked: true, on: !s.wardrobe.some((x) => x.on) }, ...s.wardrobe]) {
+        const b = el('button', 'qa ward' + (it.on ? ' on' : '') + (it.unlocked ? '' : ' locked'));
+        const cv = document.createElement('canvas');
+        cv.width = 64 * dpr; cv.height = 64 * dpr;
+        b.append(cv, el('span', '', it.unlocked ? it.label : `🔒 Level ${it.level}`));
+        b.title = it.unlocked ? it.label : `${it.label} — unlocks at bond level ${it.level}`;
+        b.disabled = !it.unlocked;
+        b.addEventListener('click', () => cmd('wear', { item: it.k }));
+        box.appendChild(b);
+        const x = cv.getContext('2d');
+        x.setTransform(dpr, 0, 0, dpr, 0, 0);
+        x.translate(32, 60); x.scale(0.62, 0.62);
+        if (!it.unlocked) x.globalAlpha = 0.35;
+        CatArt.drawCat(x, CatArt.makePose('sitFront', { t: 0, T: 1, phase: 0, m: {} }), { eyes: 'normal', blush: 0.3 }, { T: 1, palette: s.settings.palette, eyes: s.cat.eyes, accessory: it.k === 'none' ? null : it.k });
+      }
+    }
+    const gk = JSON.stringify(s.gifts);
+    if (gk !== giftKey) {
+      giftKey = gk;
+      const box = $('#giftShelf');
+      box.innerHTML = '';
+      const got = (s.gifts || []).filter((g) => g.n > 0);
+      if (!got.length) box.appendChild(el('p', 'muted small', `No gifts yet. A happy, well-loved cat sometimes brings you little presents — click them to keep them here.`));
+      for (const g of got) {
+        const d = el('div', 'gift');
+        const cv = document.createElement('canvas');
+        cv.width = 48 * dpr; cv.height = 40 * dpr;
+        d.append(cv, el('b', '', `×${g.n}`), el('span', '', g.label));
+        box.appendChild(d);
+        if (window.PropsArt && PropsArt.PROPS.gift) {
+          const x = cv.getContext('2d');
+          x.setTransform(dpr, 0, 0, dpr, 0, 0);
+          x.translate(24, 34); x.scale(1.2, 1.2);
+          PropsArt.PROPS.gift(x, g.k, 1);
+        }
+      }
+    }
+  }
   swatches($('#eyes'), EYES, 'eyes', (k) => (k === 'odd' ? 'odd-eyed' : k));
 
   // ------------------------------------------------------------ the hero parts, rebuilt when the character changes
@@ -274,7 +355,8 @@
     const ch = s.character;
     document.body.dataset.platform = s.platform;
     document.body.dataset.character = ch;
-    document.body.dataset.theme = isHero(ch) ? artOf(ch).theme : 'cat';
+    document.body.dataset.theme = isHero(ch) ? artOf(ch).theme : s.extras ? 'cozy' : 'cat';
+    document.body.dataset.extras = s.extras ? '1' : '';
     renderSwitcher(s);
     const me = (s.characters || []).find((c) => c.id === ch);
     if (ch !== prevChar) {
@@ -310,6 +392,7 @@
       if (c.dead) $$('#needs .need').forEach((r) => r.classList.remove('low'));
       for (const b of $('#quick').children) b.classList.toggle('on', !!b.dataset.tool && s.tool === b.dataset.tool);
       for (const d of $('#stats').children) d.querySelector('b').textContent = (s.counters[d.dataset.k] || 0).toLocaleString();
+      if (s.extras) applyExtras(s);
       $$('#fur .sw').forEach((b) => b.classList.toggle('on', b.dataset.v === s.settings.palette));
       $$('#eyes .sw').forEach((b) => b.classList.toggle('on', b.dataset.v === c.eyes));
       renderMemorial(s.memorial || []);
@@ -376,7 +459,7 @@
     if (!c.dead && !c.sleeping && Math.sin(T * 0.9) > 0.985) face = Object.assign({}, face, { open: 0.05 });
     const pose = CatArt.makePose(name, { t: T, T, phase: 0, m: { tailUp: st.fun > 50 ? 0.8 : 0.2, thin: st.food < 25 ? (25 - st.food) / 25 : 0 } });
     ctx.scale(scale, scale);
-    CatArt.drawCat(ctx, pose, face, { T, palette: c.palette, eyes: c.eyes });
+    CatArt.drawCat(ctx, pose, face, { T, palette: c.palette, eyes: c.eyes, accessory: state && state.extras ? state.settings.accessory : null });
   }
 
   let last = 0;
@@ -424,7 +507,7 @@
         else { a.x.translate(21, 108); a.x.scale(0.95, 0.95); ART.drawBust(a.x, look, T); }
       } else {
         a.x.translate(16, 41); a.x.scale(0.52, 0.52);
-        CatArt.drawCat(a.x, CatArt.makePose('sitFront', { t: T, T, phase: 0, m: {} }), { eyes: 'normal', blush: 0.3 }, { T, palette: state.settings.palette, eyes: (state.cat && state.cat.eyes) || 'blue' });
+        CatArt.drawCat(a.x, CatArt.makePose('sitFront', { t: T, T, phase: 0, m: {} }), { eyes: 'normal', blush: 0.3 }, { T, palette: state.settings.palette, eyes: (state.cat && state.cat.eyes) || 'blue', accessory: state.extras ? state.settings.accessory : null });
       }
       a.x.restore();
     }

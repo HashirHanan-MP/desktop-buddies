@@ -15,7 +15,7 @@
  * runs from his feet.
  */
 const { Hero, ENEMY, util } = require('../ironman');
-const { rand, chance, pick, clamp, lerp, dist } = util;
+const { rand, chance, pick, clamp, lerp, dist, isBoss } = util;
 
 const HANG = 100;   // feet → web-shooter along his body, in hero units
 const G = 1500;     // gravity for jumps and drops (DIP/s² at size 1)
@@ -811,7 +811,7 @@ class SpiderHero extends Hero {
   // ------------------------------------------------------------ combat
   * taskCombat() {
     const w = this.w, s = this.s;
-    if (!this.ally || w.allies.length <= 2) this.say(w.enemies.some((e) => e.kind === 'boss') ? this.line('heavyThreat') : this.line('threat'), 'warn');
+    if (!this.ally || w.allies.length <= 2) this.say(w.enemies.some(isBoss) ? this.line('heavyThreat') : this.line('threat'), 'warn');
     w.sound('spSense', this);
     while (w.enemies.length) {
       yield;
@@ -832,9 +832,9 @@ class SpiderHero extends Hero {
       const tc = w.enemyCenter(target);
       const d = dist(tc, this.chest());
       const near = w.enemies.filter((e) => dist(w.enemyCenter(e), tc) < 150 * w.s).length;
-      if (this.missiles >= 1 && this.cd.impact <= 0 && (near >= 3 || (target.kind === 'boss' && chance(0.3)))) yield* this.impactWeb(tc);
-      else if (target.air && target.kind !== 'mini' && this.cd.yank <= 0 && d < 460 * s && chance(0.65)) yield* this.webYank(target);
-      else if (!target.air && target.kind !== 'boss' && this.cd.throw <= 0 && w.enemies.length >= 3 && d < 420 * s && chance(0.5)) yield* this.swingThrow(target);
+      if (this.missiles >= 1 && this.cd.impact <= 0 && (near >= 3 || (isBoss(target) && chance(0.3)))) yield* this.impactWeb(tc);
+      else if (target.air && target.kind !== 'mini' && !isBoss(target) && this.cd.yank <= 0 && d < 460 * s && chance(0.65)) yield* this.webYank(target);
+      else if (!target.air && !isBoss(target) && this.cd.throw <= 0 && w.enemies.length >= 3 && d < 420 * s && chance(0.5)) yield* this.swingThrow(target);
       else if (this.cd.zip <= 0 && d < 520 * s && d > 80 * s && (target.stun > 0 || !target.air || chance(0.45))) yield* this.zipKick(target);
       else if (d < 80 * s) yield* this.combo(target);
       else {
@@ -856,7 +856,7 @@ class SpiderHero extends Hero {
     const tc = w.enemyCenter(target);
     const slot = this.ally ? w.allies.indexOf(this) + 1 : 0;
     const side = Math.abs(this.x - tc.x) < 40 * s ? (chance(0.5) ? 1 : -1) : Math.sign(this.x - tc.x);
-    const range = ((target.kind === 'boss' ? 300 : 220) + (slot % 3) * 45) * s;
+    const range = ((ENEMY[target.kind].giant ? 420 : isBoss(target) ? 300 : 220) + (slot % 3) * 45) * s;
     const d = w.geo.displayAt(tc) || w.geo.nearestDisplay(tc);
     const wx = clamp(tc.x + side * range, d.work.x + 50 * s, d.work.x + d.work.width - 50 * s);
     const stop = () => !w.enemies.includes(target) || !!w.nuke || (!this.ally && !!w.announcement);
@@ -1108,8 +1108,8 @@ class SpiderHero extends Hero {
       else if (p.y < this.floorAt(p.x, p.y) - 80 * s) yield* this.zipTo(p);
       else { yield* this.swingTo({ x: p.x, y: this.cruiseY(p.x, p.y) }, { timeout: 6 }); yield* this.land(p.x); }
     } else if (kind === 'yank') {
-      if (e && e.air && e.kind !== 'boss') yield* this.webYank(e);
-      else if (e && e.kind !== 'boss') yield* this.swingThrow(e);
+      if (e && e.air && !isBoss(e)) yield* this.webYank(e);
+      else if (e && !isBoss(e)) yield* this.swingThrow(e);
       else yield* this.webShots(e, 2, p);
     } else yield* this.webShots(e, 2, p);
     yield* this.wait(0.3);
@@ -1334,16 +1334,16 @@ SpiderHero.REMINDER = {
 SpiderHero.UI = {
   title: 'YOUR FRIENDLY NEIGHBOR',
   quick: [['🔄', 'Swing around', 'patrol'], ['🤸', 'Backflip', 'flip'], ['🤟', 'Thwip!', 'thumbsUp'], ['🩹', 'Patch up', 'repair'], ['🧪', 'Refill webs', 'recharge'], ['🌀', 'Spider-Verse', 'callAllies', { count: 3 }], ['👋', 'Send home', 'dismissAllies'], ['⬇️', 'Drop down', 'land']],
-  stats: [['kills', 'bad guys stopped'], ['drones', 'drones'], ['walkers', 'walkers'], ['tanks', 'tanks'], ['bosses', 'heavy mechs'], ['armiesWon', 'armies beaten'], ['webs', 'web shots'], ['zipKicks', 'zip kicks'], ['yanks', 'drones yanked'], ['throws', 'walkers flung'], ['impactWebs', 'impact webs'], ['swings', 'web swings'], ['legion', 'spider-friends called'], ['nukes', 'nukes survived'], ['reboots', 'knockouts']],
+  stats: [['kills', 'bad guys stopped'], ['drones', 'Ultron drones'], ['walkers', 'Ultron soldiers'], ['tanks', 'Ultron heavies'], ['bosses', 'villains webbed up'], ['thanos', 'Thanos'], ['doom', 'Doctor Doom'], ['kang', 'Kang'], ['galactus', 'Galactus'], ['armiesWon', 'armies beaten'], ['webs', 'web shots'], ['zipKicks', 'zip kicks'], ['yanks', 'drones yanked'], ['throws', 'walkers flung'], ['impactWebs', 'impact webs'], ['swings', 'web swings'], ['legion', 'spider-friends called'], ['nukes', 'nukes survived'], ['reboots', 'knockouts']],
   looks: { key: 'spiderSuit', options: LOOKS },
   armyNote: (n, size) => (size === 'legendary'
-    ? 'All 5 Spider-Verse heroes swing in, and a new one arrives when one taps out. About 5 minutes of web-slinging.'
-    : size === 'epic' ? 'All 5 Spider-Verse heroes swing in. Heavy mechs in every wave.'
+    ? 'All 5 Spider-Verse heroes swing in, and a new one arrives when one taps out. It ends with Galactus. About 5 minutes of web-slinging.'
+    : size === 'epic' ? 'All 5 Spider-Verse heroes swing in. Thanos, Doom and Kang lead the waves.'
       : `Spider-Man will call ${n} friends from the Spider-Verse.`),
   help: [
     ['🖱️ The menu', 'Right-click anywhere (or on Spider-Man) for the web menu. The tray icon and <b class="sc"></b> work too.'],
     ['🕸️ Getting around', 'He can\'t fly — he swings. Webs stick to the top edge of your screen and he swings in arcs from screen to screen, zips up a line, or hangs upside-down from a thread. Drag him and let go: he catches a web.'],
-    ['🎯 Bad guys', '<i>Deploy enemy</i> drops a drone, walker, tank, drone swarm or a heavy mech where you right-clicked. Click an enemy to make it his next target.'],
+    ['🎯 Bad guys', '<i>Deploy enemy</i> drops Ultron\'s robots (sentry, soldier, heavy, swarm) or a supervillain — Thanos, Doctor Doom, Kang, or the giant Galactus — where you right-clicked. Click an enemy to make it his next target.'],
     ['💥 Moves', 'Web shots stick enemies in place (webbed drones sink to the floor, webbed walkers can\'t shoot). He zips in for kicks, yanks drones down and slams them, flings a webbed walker into its friends, and throws impact webs that snare a whole group. His spider-sense makes him flip out of the way.'],
     ['🧪 Web fluid', 'Every web uses web fluid; it refills while he\'s on the floor. Impact webs reload slowly. Out of health? He\'s knocked out for a moment, then gets back up.'],
     ['⚔ Army attack &amp; the Spider-Verse', 'Pick a side and a size — up to a legendary 1000. Spider-Man calls up to 5 friends from other dimensions; when one taps out, another swings in.'],

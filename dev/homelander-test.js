@@ -49,12 +49,12 @@ assert.strictEqual(h.mode, 'ground', 'should land after arriving');
 console.log('arrived:', h.taskName, h.pose);
 step(sec(60)); // idle life
 
-// every enemy type, one at a time
-for (const kind of ['drone', 'walker', 'tank', 'swarm', 'boss']) {
+// every enemy type, one at a time: Ultron's army, then every villain ('boss' = Thanos, the old name)
+for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
   const d = geo.displays[kind === 'tank' ? 1 : 0];
   w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });
   let t = 0;
-  while (w.enemies.length && t < sec(90)) { step(1); t++; }
+  while (w.enemies.length && t < sec(kind === 'galactus' ? 180 : 90)) { step(1); t++; }
   console.log(`${kind}: cleared=${!w.enemies.length} in ${(t / 60).toFixed(1)}s, kills=${w.counters.kills}, heat=${h.power.toFixed(0)}, health=${h.armor.toFixed(0)}, approval=${h.approval.toFixed(0)}`);
   assert(!w.enemies.length, `${kind} not defeated`);
   step(sec(4));

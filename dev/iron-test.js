@@ -38,12 +38,13 @@ assert.strictEqual(w.hero.mode, 'ground', 'should land after arriving');
 console.log('arrived:', w.hero.taskName, w.hero.pose);
 step(sec(60)); // idle life
 
-// every enemy type, one at a time
-for (const kind of ['drone', 'walker', 'tank', 'swarm', 'boss']) {
+// every enemy type, one at a time: Ultron's army, then every villain ('boss' = Thanos, the old name)
+for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
   const d = geo.displays[kind === 'tank' ? 1 : 0];
+  w.hero.power = 100; // a breather between fights
   w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });
   let t = 0;
-  while (w.enemies.length && t < sec(90)) { step(1); t++; if (w.hero.armor < 30) w.hero.armor = 80; }
+  while (w.enemies.length && t < sec(kind === 'galactus' ? 180 : 90)) { step(1); t++; if (w.hero.armor < 30) w.hero.armor = 80; }
   console.log(`${kind}: cleared=${!w.enemies.length} in ${(t / 60).toFixed(1)}s, kills=${w.counters.kills}, power=${w.hero.power.toFixed(0)}, missiles=${w.hero.missiles}`);
   assert(!w.enemies.length, `${kind} not defeated`);
   step(sec(4));
@@ -54,6 +55,42 @@ for (const kind of ['repulsor', 'missiles', 'unibeam', 'blast']) {
   w.hero.power = 100;
   w.command('attack', { kind, x: 900, y: 300 });
   step(sec(3));
+}
+
+// the three suits: switch, check size & toughness, and fight in each
+{
+  const hh = w.hero;
+  const hurt20 = () => { hh.armor = 100; w.hurtHero(20, null); return 100 - hh.armor; };
+  const lost = {};
+  for (const suit of ['classic', 'mark50', 'hulkbuster']) {
+    settings.suit = suit; // (main.js applies the 'setting' command to this shared settings object)
+    step(sec(1));
+    const snap = w.snapshot();
+    assert.strictEqual(snap.hero.suit, suit, `snapshot carries the suit (${suit})`);
+    lost[suit] = hurt20();
+    step(sec(2));
+    hh.armor = 100; hh.power = 100;
+    const d = geo.displays[0];
+    w.command('spawn', { kind: 'walker', x: d.work.x + d.work.width * 0.65, y: d.work.y + d.work.height * 0.5 });
+    w.command('spawn', { kind: 'drone', x: d.work.x + d.work.width * 0.4, y: d.work.y + d.work.height * 0.3 });
+    let t = 0;
+    while (w.enemies.length && t < sec(60)) { step(1); t++; }
+    assert(!w.enemies.length, `${suit} clears the enemies`);
+    console.log(`suit ${suit}: body ${hh.bodyScale}, s ${hh.s.toFixed(2)}, a 20-pt hit costs ${lost[suit].toFixed(1)}, cleared 2 enemies in ${(t / 60).toFixed(1)}s, body in snapshot ${w.snapshot().hero.body}`);
+    step(sec(2));
+  }
+  assert.strictEqual(lost.classic, 20, 'the Mark III takes full damage');
+  assert(lost.mark50 < lost.classic && lost.hulkbuster < lost.mark50, 'Mark 50 is tougher, the Hulkbuster tougher still');
+  assert.strictEqual(settings.suit, 'hulkbuster');
+  assert(w.hero.s > w.s * 1.3 && w.snapshot().hero.body > 1.3, 'the Hulkbuster is bigger');
+  assert(w.heroBox().w > 36 * w.s * 1.3, 'and easier to grab');
+  // the Legion keeps its own colors and normal size
+  w.command('callAllies', { count: 2 });
+  step(sec(2));
+  assert(w.allies.length && w.allies.every((a) => a.bodyScale === 1 && a.suitKey !== 'hulkbuster'), 'Legion suits are normal-sized recolors');
+  w.command('dismissAllies');
+  step(sec(6));
+  settings.suit = 'classic';
 }
 
 // suit goes offline at zero armor and reboots

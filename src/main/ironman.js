@@ -37,13 +37,23 @@ const SIZES = { tiny: 0.8, small: 1, medium: 1.3, large: 1.6 };
 const DIFF = { easy: { hp: 0.8, dmg: 0.5, rate: 0.75 }, normal: { hp: 1, dmg: 1, rate: 1 }, hard: { hp: 1.35, dmg: 1.5, rate: 1.3 } };
 const INVASIONS = { off: null, rare: [20 * 60, 40 * 60], often: [4 * 60, 9 * 60] };
 
+// The enemies: Ultron's robot army, and the villains as bosses (boss: true).
+// r = hit radius, cy = centre height above the feet (0 for flyers). Galactus is a giant
+// whose hit circle covers his legs, so every hero (even one who can't fly) can reach him.
 const ENEMY = {
-  drone: { hp: 3, air: true, speed: 150, fire: [1.6, 3.0], dmg: 4, score: 1, r: 15, cy: 0, label: 'DRONE' },
-  mini: { hp: 1, air: true, speed: 240, kamikaze: true, dmg: 4, score: 1, r: 9, cy: 0, label: 'SWARM' },
-  walker: { hp: 6, air: false, speed: 48, fire: [2.0, 3.2], dmg: 5, score: 2, r: 20, cy: -24, label: 'WALKER' },
-  tank: { hp: 12, air: false, speed: 34, fire: [3.2, 4.6], dmg: 9, score: 3, r: 24, cy: -13, label: 'TANK' },
-  boss: { hp: 45, air: false, speed: 24, fire: [2.6, 3.6], dmg: 8, score: 10, r: 50, cy: -62, label: 'HEAVY MECH' },
+  drone: { hp: 3, air: true, speed: 150, fire: [1.6, 3.0], dmg: 4, score: 1, r: 15, cy: 0, label: 'ULTRON SENTRY' },
+  mini: { hp: 1, air: true, speed: 240, kamikaze: true, dmg: 4, score: 1, r: 9, cy: 0, label: 'ULTRON DRONE' },
+  walker: { hp: 6, air: false, speed: 48, fire: [2.0, 3.2], dmg: 5, score: 2, r: 20, cy: -26, label: 'ULTRON SOLDIER' },
+  tank: { hp: 12, air: false, speed: 34, fire: [3.2, 4.6], dmg: 9, score: 3, r: 26, cy: -28, label: 'ULTRON HEAVY' },
+  thanos: { hp: 60, air: false, speed: 24, fire: [2.4, 3.4], dmg: 9, score: 12, r: 46, cy: -66, boss: true, label: 'THANOS' },
+  doom: { hp: 48, air: true, speed: 95, fire: [1.6, 2.6], dmg: 5, score: 10, r: 36, cy: 0, boss: true, label: 'DOCTOR DOOM' },
+  kang: { hp: 52, air: false, speed: 34, fire: [1.8, 2.8], dmg: 4, score: 10, r: 34, cy: -50, boss: true, label: 'KANG THE CONQUEROR' },
+  galactus: { hp: 150, air: false, speed: 0, fire: [3.0, 4.2], dmg: 12, score: 50, r: 150, cy: -150, boss: true, giant: true, label: 'GALACTUS' },
 };
+// older names still work ("boss" was the heavy mech, "swarm" the mini-drones)
+const ENEMY_ALIAS = { boss: 'thanos', mech: 'thanos', swarm: 'mini', ultron: 'walker' };
+const BOSSES = ['thanos', 'doom', 'kang']; // army bosses (Galactus only ends a legendary battle)
+const isBoss = (e) => !!(e && ENEMY[e.kind] && ENEMY[e.kind].boss);
 
 const QUIPS_GREET = ['Hey there.', 'Systems nominal.', 'Need something?', 'Suit check: looking good.', 'All good up here.', 'At your service.'];
 const QUIPS_POKE = ['Careful with the paint job.', 'That tickles. Not really.', 'Hands off the armor!', 'Okay, okay, I\'m awake.'];
@@ -52,18 +62,26 @@ const QUIPS_WIN = ['Threat neutralized.', 'That was almost too easy.', 'Area sec
 
 const DEFAULT_IRON = { power: 100, armor: 100, missiles: 12 };
 
+// The armored hero's three suits (ironArt.js draws them). body = size on screen,
+// tough = share of incoming damage that gets through, punch = melee damage, step = footstep spacing.
+const SUIT_FORMS = {
+  classic: { label: 'Mark III — Classic', body: 1, tough: 1, punch: 3, step: 15 },
+  mark50: { label: 'Mark 50 — Nanotech', body: 1, tough: 0.8, punch: 5, step: 15 },
+  hulkbuster: { label: 'Hulkbuster', body: 1.4, tough: 0.55, punch: 7, step: 22 },
+};
+
 // Lines the world says through the hero. A subclass overrides any of them:
 // a string, a list (one is picked) or a function of the arguments.
 const IRON_LINES = {
   threat: 'THREAT DETECTED',
-  heavyThreat: 'WARNING: HEAVY UNIT',
+  heavyThreat: 'WARNING: SUPERVILLAIN',
   victory: QUIPS_WIN,
-  bossDown: 'HEAVY UNIT DOWN',
+  bossDown: 'VILLAIN DOWN',
   bossBeam: 'INCOMING BEAM!',
   locked: (label) => `TARGET LOCKED: ${label}`,
   invasion: 'INCOMING!',
   army: (total) => (total >= 1000 ? 'LEGENDARY BATTLE: 1000 HOSTILES' : `HOSTILE ARMY: ${total} UNITS`),
-  armyBoss: 'HEAVY MECH INBOUND',
+  armyBoss: 'VILLAIN INBOUND',
   milestone: (m, done) => (m === 1 ? `${done} DOWN. KEEP PUSHING!` : m === 2 ? 'HALFWAY THERE, LEGION!' : `${done}! THEY'RE BREAKING!`),
   callAllies: 'CALLING THE LEGION',
   allyReplace: 'REINFORCEMENTS, JARVIS',
@@ -117,7 +135,21 @@ class Hero {
   }
 
   // hero scale: the world's size setting × how big this hero's body is
-  get s() { return this.w.s * this.constructor.BODY; }
+  get s() { return this.w.s * this.bodyScale; }
+
+  // the armored hero's suit (the main suit wears the `suit` setting, the Legion its own colors)
+  get suitKey() { return this.ally ? this.suit : this.w.settings.suit; }
+  get suitForm() { return (this.constructor === Hero && SUIT_FORMS[this.suitKey]) || SUIT_FORMS.classic; }
+  // body size: the class's BODY × the suit's (the Hulkbuster is huge)
+  get bodyScale() { return this.constructor.BODY * this.suitForm.body; }
+
+  // incoming damage is cut by the suit's toughness (other heroes bring their own armor accessors)
+  get armor() { return this._armor; }
+  set armor(v) {
+    const old = this._armor;
+    if (old != null && v < old && this.suitForm.tough < 1) v = old - (old - v) * this.suitForm.tough;
+    this._armor = v;
+  }
 
   line(key, ...a) {
     const L = this.constructor.LINES[key] != null ? this.constructor.LINES[key] : IRON_LINES[key];
@@ -235,8 +267,12 @@ class Hero {
       this.x += dir * step;
       this.dist += step;
       this.setPose('walk');
-      // heavy footsteps
-      if (this.dist - this.lastStep > 15 * s) { this.lastStep = this.dist; this.w.sound('clank', this); }
+      // heavy footsteps (the Hulkbuster's shake the floor)
+      if (this.dist - this.lastStep > this.suitForm.step * s) {
+        this.lastStep = this.dist;
+        this.w.sound(this.suitForm.body > 1 ? 'thud' : 'clank', this);
+        if (this.suitForm.body > 1) this.w.fx('shockwave', this.x, this.y, { size: 0.3 });
+      }
       t += this.dt;
       if (t > (o.timeout || 20) || (o.until && o.until())) break;
       yield;
@@ -496,9 +532,12 @@ class Hero {
     this.setPose('punch');
     yield* this.wait(0.16);
     if (e.hp > 0 && dist(c, this.chest()) < 90 * s) {
-      w.damage(e, 3, this.chest());
+      const F = this.suitForm;
+      w.damage(e, F.punch, this.chest()); // Mark 50: a nano-blade; Hulkbuster: a fist the size of a car
       w.sound('hit', e);
-      if (e.air) { e.vx += this.facing * 420 * s; e.vy -= 120 * s; }
+      if (F.body > 1 && e.hp > 0 && w.launchEnemy) w.launchEnemy(e, this.facing * 640 * s, -360 * s, { dmg: 2 });
+      else if (e.air) { e.vx += this.facing * 420 * s; e.vy -= 120 * s; }
+      if (F.body > 1) w.fx('shockwave', c.x, c.y, { size: 0.8 });
     }
     yield* this.wait(0.25);
   }
@@ -737,7 +776,7 @@ class Hero {
 
   * taskCombat() {
     const w = this.w, s = this.s;
-    this.say(w.enemies.some((e) => e.kind === 'boss') ? this.line('heavyThreat') : this.line('threat'), 'warn');
+    this.say(w.enemies.some(isBoss) ? this.line('heavyThreat') : this.line('threat'), 'warn');
     w.sound('alert', this);
     let engaged = 0;
     while (w.enemies.length) {
@@ -759,7 +798,7 @@ class Hero {
       // get into position
       const dx = this.x - tc.x;
       const side = Math.abs(dx) < 40 * s ? (chance(0.5) ? 1 : -1) : Math.sign(dx);
-      const range = (target.kind === 'boss' ? 380 : 260) * s;
+      const range = (ENEMY[target.kind].giant ? 520 : isBoss(target) ? 380 : 260) * s;
       // each suit of the Legion keeps its own slot so they don't stack up
       const slot = this.ally ? w.allies.indexOf(this) + 1 : 0;
       const sx = side * Math.floor(slot / 3) * 70 * s, sy = ((slot % 3) - (slot % 3 === 2 ? 3 : 0)) * 80 * s;
@@ -796,9 +835,9 @@ class Hero {
       const dd = dist(t2, this.chest());
       const lineCount = w.enemiesInCone(this, t2, 0.25).length;
       engaged++;
-      if (this.cd.unibeam <= 0 && this.power > 32 && (target.kind === 'boss' || lineCount >= 3) && engaged > 1) {
+      if (this.cd.unibeam <= 0 && this.power > 32 && (isBoss(target) || lineCount >= 3) && engaged > 1) {
         yield* this.unibeam(t2);
-      } else if (this.cd.missiles <= 0 && this.missiles >= 2 && (w.enemies.length >= 3 || target.kind === 'tank' || target.kind === 'boss')) {
+      } else if (this.cd.missiles <= 0 && this.missiles >= 2 && (w.enemies.length >= 3 || target.kind === 'tank' || isBoss(target))) {
         yield* this.missileBarrage(w.enemies.slice().sort((a, b) => dist(w.enemyCenter(a), this) - dist(w.enemyCenter(b), this)).slice(0, 4));
       } else if (dd < 70 * s) {
         yield* this.punch(target);
@@ -1116,7 +1155,7 @@ class Hero {
           { icon: '🦾', label: w.allies.length ? `Dismiss the Legion (${w.allies.length})` : 'Call the Iron Legion', cmd: w.allies.length ? 'dismissAllies' : 'callAllies', args: { count: 3 } },
           { icon: '🖥️', label: 'Run diagnostics', cmd: 'diagnostics', hint: 'CPU · memory · battery' },
           '-',
-          ...[['classic', 'Classic red & gold'], ['stealth', 'Stealth'], ['silver', 'Silver prototype'], ['patriot', 'Patriot']].map(([k, l]) => ({ icon: '🎨', label: l, cmd: 'setting', args: { key: 'suit', value: k }, checked: w.settings.suit === k })),
+          ...Object.entries(SUIT_FORMS).map(([k, f]) => ({ icon: SUIT_ICONS[k], label: f.label, cmd: 'setting', args: { key: 'suit', value: k }, checked: (SUIT_FORMS[w.settings.suit] ? w.settings.suit : 'classic') === k, hint: SUIT_HINTS[k] })),
         ],
       },
     ];
@@ -1127,11 +1166,17 @@ class Hero {
     return [['Patrol the screens', 'patrol'], ['Repair & recharge', 'repair+recharge']];
   }
 
-  // hero-specific fields for the renderer (merged into the hero snapshot)
-  snapExtra() { return null; }
+  // hero-specific fields for the renderer (merged into the hero snapshot): the suit, and a bigger suit draws bigger
+  snapExtra() {
+    if (this.constructor !== Hero) return null;
+    return { suit: this.suitKey, ...(this.bodyScale !== Hero.BODY ? { body: this.bodyScale } : {}) };
+  }
 
   serialize() { return { power: this.power, armor: this.armor, missiles: this.missiles, x: this.x, y: this.y }; }
 }
+
+const SUIT_ICONS = { classic: '🔴', mark50: '✨', hulkbuster: '🦍' };
+const SUIT_HINTS = { classic: 'the original', mark50: 'nano blades · tougher', hulkbuster: 'huge · smashes · very tough' };
 
 // ---- class-level description of the armored hero (subclasses replace these)
 Hero.ID = 'ironman';
@@ -1140,15 +1185,17 @@ Hero.BODY = 1;           // body size relative to the armored hero
 Hero.LINES = IRON_LINES;
 // home window: quick commands [icon, label, cmd, args], record [counter, label], guide [[title, html]]
 Hero.UI = {
-  title: 'MARK XLII',
+  title: 'STARK INDUSTRIES',
   quick: [['🔄', 'Patrol', 'patrol'], ['💨', 'Fly-by', 'flyby'], ['📡', 'Scan', 'scan'], ['🖥️', 'Diagnostics', 'diagnostics'], ['🛠️', 'Repair', 'repair'], ['⚡', 'Recharge', 'recharge'], ['🦾', 'Call Legion', 'callAllies', { count: 3 }], ['👋', 'Dismiss Legion', 'dismissAllies']],
-  stats: [['kills', 'threats down'], ['drones', 'drones'], ['walkers', 'walkers'], ['tanks', 'tanks'], ['bosses', 'heavy mechs'], ['armiesWon', 'armies beaten'], ['nukes', 'nukes dropped'], ['legion', 'legion suits called'], ['waves', 'waves cleared'], ['shotsFired', 'repulsor shots'], ['missiles', 'missiles fired'], ['reboots', 'suit reboots']],
-  looks: { key: 'suit', options: [['classic', 'Classic red & gold', 'linear-gradient(135deg,#c41f2a 55%,#f2b134 55%)'], ['stealth', 'Stealth', 'linear-gradient(135deg,#343843 55%,#9aa3b3 55%)'], ['silver', 'Silver prototype', 'linear-gradient(135deg,#b8bfca 55%,#e1e5eb 55%)'], ['patriot', 'Patriot', 'linear-gradient(135deg,#26408f 55%,#ffffff 55%)']] },
+  stats: [['kills', 'threats down'], ['drones', 'Ultron drones'], ['walkers', 'Ultron soldiers'], ['tanks', 'Ultron heavies'], ['bosses', 'villains beaten'], ['thanos', 'Thanos'], ['doom', 'Doctor Doom'], ['kang', 'Kang'], ['galactus', 'Galactus'], ['armiesWon', 'armies beaten'], ['nukes', 'nukes dropped'], ['legion', 'legion suits called'], ['waves', 'waves cleared'], ['shotsFired', 'repulsor shots'], ['missiles', 'missiles fired'], ['reboots', 'suit reboots']],
+  // the three suits (the other color schemes are worn by the Iron Legion)
+  looks: { key: 'suit', options: [['classic', 'Mark III — Classic', 'linear-gradient(135deg,#c41f2a 55%,#f2b134 55%)'], ['mark50', 'Mark 50 — Nanotech', 'linear-gradient(135deg,#a8101c 40%,#f5c542 40% 70%,#a8101c 70%)'], ['hulkbuster', 'Hulkbuster', 'radial-gradient(circle at 50% 45%,#e9fbff 0 18%,#c41f2a 19% 62%,#f2b134 63%)']] },
   armyNote: (n, size) => (size === 'legendary' ? 'All 7 Iron Legion suits join, with replacements when one goes down. About 4 minutes of war.' : `Iron Man will call ${n} more suits from the Iron Legion.`),
   help: [
     ['🖱️ The menu', 'Right-click anywhere (or on Iron Man) for the suit menu. Tray icon and <b class="sc"></b> work too.'],
-    ['🎯 Enemies', '<i>Deploy enemy</i> drops a flying drone, ground walker, tank, drone swarm or a heavy mech exactly where you right-clicked. Iron Man engages automatically. Click an enemy to lock it as his priority target.'],
+    ['🎯 Enemies', '<i>Deploy enemy</i> drops Ultron\'s robots — a flying sentry, a soldier, a heavy or a swarm — or a supervillain: <b>Thanos</b>, <b>Doctor Doom</b>, <b>Kang the Conqueror</b>, or the giant <b>Galactus</b>, exactly where you right-clicked. Iron Man engages automatically. Click an enemy to lock it as his priority target.'],
     ['💥 Weapons', 'Repulsors (palm blasts), double hand blast for close range, homing micro-missiles from the shoulders, and the arc-reactor unibeam that cuts through a whole line. <i>Attack here</i> fires at the spot you right-clicked.'],
+    ['🦾 Three suits', 'Pick one from <i>Suit</i> in the menu or in Settings: the <b>Mark III</b> classic; the <b>Mark 50</b> nanotech suit — sleeker, tougher, with nano-blades for punches and a nano-shield when he braces; or the <b>Hulkbuster</b> — a huge armor that shakes the floor as it walks, shrugs off damage and punches enemies across the screen.'],
     ['⚡ Power &amp; armor', 'Flying and weapons drain the arc reactor; standing on the ground recharges it. Missiles reload slowly. If armor hits zero the suit goes offline, falls, and reboots.'],
     ['🛫 Flight', 'He lives on the floor of your screens — to go anywhere higher he has to fly. Drag him and let go: his thrusters catch him.'],
     ['⚔ Army attack &amp; the Iron Legion', 'Pick a side and a size — up to a legendary 1000 attackers. Iron Man calls in up to 7 Iron Legion suits to fight with him; in epic battles a destroyed suit is replaced.'],
@@ -1173,7 +1220,7 @@ class HeroWorld {
     this.emit = emit || (() => {});
     this.sysinfo = sysinfo || (() => ({}));
     this.settings = settings;
-    this.counters = { kills: 0, drones: 0, walkers: 0, tanks: 0, bosses: 0, shotsFired: 0, missiles: 0, unibeams: 0, reboots: 0, waves: 0, nukes: 0, armies: 0, armiesWon: 0, legion: 0, ...((data && data.counters) || {}) };
+    this.counters = { kills: 0, drones: 0, walkers: 0, tanks: 0, bosses: 0, thanos: 0, doom: 0, kang: 0, galactus: 0, shotsFired: 0, missiles: 0, unibeams: 0, reboots: 0, waves: 0, nukes: 0, armies: 0, armiesWon: 0, legion: 0, ...((data && data.counters) || {}) };
     this.hero = new this.H(this, data && data.hero);
     this.allies = [];
     this.nuke = null;
@@ -1250,19 +1297,28 @@ class HeroWorld {
 
   spawn(kind, p, o) {
     o = o || {};
+    kind = ENEMY_ALIAS[kind] || kind;
     const s = this.s, k = ENEMY[kind];
     if (!k || this.enemies.length >= (o.max || 30)) return null;
-    const q = this.geo.clampWork(p, 40 * s);
+    if (k.giant && this.enemies.some((x) => x.kind === kind)) return null; // one Galactus is plenty
+    let q = this.geo.clampWork(p, 40 * s);
+    if (k.giant) {
+      // the giant towers at the side of the screen nearest to where he was called
+      const d = this.geo.displayAt(q) || this.geo.nearestDisplay(q);
+      q = { x: q.x < d.work.x + d.work.width / 2 ? d.work.x + 40 * s : d.work.x + d.work.width - 40 * s, y: d.work.y + d.work.height * 0.2 };
+    }
     const e = {
       id: uid('x'), kind, x: q.x, y: q.y, vx: 0, vy: 0, facing: q.x < this.hero.x ? 1 : -1,
       hp: k.hp * this.diff.hp, maxHp: k.hp * this.diff.hp, air: k.air, cool: rand(1, 2.5), phase: 0, charge: 0, hitAt: 0,
       orbit: rand(0, Math.PI * 2), range: rand(200, 330), alt: rand(60, 170), born: now(), state: 'idle', grounded: k.air,
     };
+    if (kind === 'doom') { e.range = rand(300, 380); e.alt = rand(110, 170); e.shieldAt = this.clock + rand(5000, 8000); }
+    if (kind === 'kang') e.warpAt = this.clock + rand(5000, 8000);
     if (o.vx) e.vx = o.vx;
     this.enemies.push(e);
     if (!o.silent) {
-      this.fx('portal', e.x, e.y + k.cy * s, {});
-      this.sound(kind === 'boss' ? 'bossSpawn' : 'spawn', e);
+      this.fx(kind === 'kang' ? 'timeportal' : 'portal', e.x, e.y + k.cy * s, { size: k.giant ? 5 : k.boss ? 2 : 1 });
+      this.sound(k.boss ? 'bossSpawn' : 'spawn', e);
     }
     this.dirty();
     const h = this.hero;
@@ -1279,7 +1335,8 @@ class HeroWorld {
     const others = this.allies.length ? this.heroes.filter((x) => x !== h) : [];
     for (const e of this.enemies) {
       const d = dist(this.enemyCenter(e), h);
-      const threat = { boss: 3, tank: 1.5, walker: 1.2, drone: 1, mini: 1.4 }[e.kind] || 1;
+      const k = ENEMY[e.kind];
+      const threat = k.giant ? 3.5 : k.boss ? 3 : { tank: 1.5, walker: 1.2, drone: 1, mini: 1.4 }[e.kind] || 1;
       // spread the suits over different targets
       const taken = others.reduce((a, x) => a + (x.targetId === e.id ? 1 : 0), 0);
       const score = threat * 400 - d * 0.6 - taken * 260;
@@ -1324,6 +1381,13 @@ class HeroWorld {
 
   damage(e, dmg, from, quiet) {
     if (e.hp <= 0) return;
+    // no single blow does much to a giant: he falls to a long fight, not one smash
+    if (ENEMY[e.kind].giant) dmg = Math.min(dmg, 4);
+    // Doom's force field soaks most of it
+    if (e.shield > 0) {
+      dmg *= 0.15;
+      if (!quiet && chance(0.3)) this.fx('spark', e.x + rand(-20, 20) * this.s, e.y + rand(-25, 25) * this.s, {});
+    }
     // the Legion fights at full power in a big battle
     e.hp -= this.army && this.army.huge ? dmg * 1.6 : dmg;
     e.hitAt = now();
@@ -1337,12 +1401,23 @@ class HeroWorld {
     this.enemies.splice(i, 1);
     const c = this.enemyCenter(e);
     if (!silent) {
+      const k = ENEMY[e.kind];
       this.counters.kills++;
-      const key = { drone: 'drones', mini: 'drones', walker: 'walkers', tank: 'tanks', boss: 'bosses' }[e.kind];
+      const key = { drone: 'drones', mini: 'drones', walker: 'walkers', tank: 'tanks' }[e.kind] || 'bosses';
       this.counters[key] = (this.counters[key] || 0) + 1;
-      this.fx('explosion', c.x, c.y, { size: e.kind === 'boss' ? 3 : e.kind === 'tank' ? 1.6 : e.kind === 'mini' ? 0.7 : 1 });
-      this.sound(e.kind === 'boss' || e.kind === 'tank' ? 'boomBig' : 'boom', c);
-      if (e.kind === 'boss') this.say(this.hero.line('bossDown'));
+      if (k.boss) this.counters[e.kind] = (this.counters[e.kind] || 0) + 1; // thanos, doom, kang, galactus
+      if (e.beam) { this.beams = this.beams.filter((b) => b !== e.beam); e.beam = null; }
+      if (k.giant) {
+        // the Devourer of Worlds falls
+        this.fx('galactusDown', e.x, e.y, { size: 1 });
+        this.fx('text', e.x + e.facing * 140 * this.s, e.y - 420 * this.s, { text: 'GALACTUS FALLS!', color: '#ffd166' });
+        this.sound('nukeBoom', c);
+        for (const h of this.heroes) if (h.mode !== 'down' && h.mode !== 'thrown') h.say(h.line('victory'));
+      } else {
+        this.fx('explosion', c.x, c.y, { size: k.boss ? 3 : e.kind === 'tank' ? 1.6 : e.kind === 'mini' ? 0.7 : 1 });
+        this.sound(k.boss || e.kind === 'tank' ? 'boomBig' : 'boom', c);
+      }
+      if (k.boss) this.say(this.hero.line('bossDown'));
     } else {
       this.fx('portal', c.x, c.y, {});
     }
@@ -1415,20 +1490,26 @@ class HeroWorld {
         this.steerEnemy(e, { x: hc.x, y: hc.y }, k.speed * s * (h.mode === 'down' ? 0.3 : 1), dt, 900 * s);
         e.facing = e.vx > 0 ? 1 : -1;
         if (d < 22 * s && h.mode !== 'down') { this.hurtHero(k.dmg, this.enemyCenter(e), h); this.kill(e); continue; }
+      } else if (e.kind === 'doom') {
+        this.tickDoom(e, dt, hc, h, d);
       } else {
         // ground units fall to the floor first
         const g = this.groundAt(e.x, e.y);
         if (!e.grounded) {
           e.vy += 1800 * s * dt; e.y += e.vy * dt;
-          if (e.y >= g) { e.y = g; e.vy = 0; e.grounded = true; this.fx('shockwave', e.x, e.y, { size: e.kind === 'boss' ? 1.6 : 0.7 }); this.sound('landing', e); }
+          if (e.y >= g) {
+            e.y = g; e.vy = 0; e.grounded = true;
+            this.fx('shockwave', e.x, e.y, { size: k.giant ? 4 : k.boss ? 1.6 : 0.7 });
+            this.sound(k.giant ? 'boomBig' : 'landing', e);
+          }
           continue;
         }
         e.y = g;
         const dx = hc.x - e.x;
-        e.facing = dx > 0 ? 1 : -1;
-        const want = (e.kind === 'boss' ? 320 : e.kind === 'tank' ? 380 : 280) * s;
+        if (e.state !== 'firing' || !k.giant) e.facing = dx > 0 ? 1 : -1;
+        const want = (k.giant ? 0 : e.kind === 'thanos' ? 300 : e.kind === 'kang' ? 360 : e.kind === 'tank' ? 380 : 280) * s;
         let mv = 0;
-        if (e.state !== 'charging' && e.state !== 'firing') {
+        if (!k.giant && e.state === 'idle') {
           if (Math.abs(dx) > want + 40 * s) mv = Math.sign(dx);
           else if (Math.abs(dx) < want - 120 * s) mv = -Math.sign(dx) * 0.6;
         }
@@ -1443,8 +1524,12 @@ class HeroWorld {
           e.aim = -0.35;
           e.charge = clamp(1 - e.cool / 0.6, 0, 1);
           if (e.cool <= 0 && h.mode !== 'down') { e.cool = rand(k.fire[0], k.fire[1]); this.enemyShell(e, muzzle, hc, k.dmg); }
-        } else if (e.kind === 'boss') {
-          this.tickBoss(e, dt, hc, h);
+        } else if (e.kind === 'thanos') {
+          this.tickThanos(e, dt, hc, h);
+        } else if (e.kind === 'kang') {
+          this.tickKang(e, dt, hc, h);
+        } else if (e.kind === 'galactus') {
+          this.tickGalactus(e, dt, hc, h);
         }
       }
     }
@@ -1454,7 +1539,8 @@ class HeroWorld {
   // stun: webbed / dazed for `sec` seconds (flyers sink to the floor); bosses shake it off faster
   stunEnemy(e, sec, kind) {
     if (!e || e.hp <= 0) return;
-    e.stun = Math.max(e.stun || 0, sec * (e.kind === 'boss' ? 0.35 : 1));
+    const k = ENEMY[e.kind];
+    e.stun = Math.max(e.stun || 0, sec * (k.giant ? 0.15 : k.boss ? 0.35 : 1));
     e.stunKind = kind || 'daze';
     this.dirty();
   }
@@ -1462,7 +1548,7 @@ class HeroWorld {
   tickStunned(e, dt) {
     const s = this.s;
     e.stun -= dt; e.charge = 0;
-    if (e.state === 'charging' || e.state === 'firing') { e.state = 'idle'; e.beam = null; e.cool = Math.max(e.cool, 1); }
+    if (e.state !== 'idle') { this.interruptEnemy(e); e.cool = Math.max(e.cool, 1); }
     const g = this.groundAt(e.x, e.y) - (e.air ? 14 * s : 0);
     if (e.y < g - 0.5) {
       e.vy = Math.min((e.vy || 0) + 900 * s * dt, 420 * s);
@@ -1479,12 +1565,13 @@ class HeroWorld {
   launchEnemy(e, vx, vy, o) {
     if (!e || e.hp <= 0) return;
     o = o || {};
-    const heavy = e.kind === 'boss' && !o.thrown ? 0.3 : 1;
+    if (ENEMY[e.kind].giant) { if (o.dmg) this.damage(e, o.dmg, e); return; } // nobody knocks Galactus over
+    const heavy = isBoss(e) && !o.thrown ? 0.3 : 1;
     e.grabbed = null;
     e.launch = { t: 0, spinV: o.spin != null ? o.spin : (vx >= 0 ? 1 : -1) * rand(6, 12) * heavy, thrown: o.thrown || null, dmg: o.dmg || 0 };
     e.vx = vx * heavy; e.vy = vy * heavy;
     e.spin = e.spin || 0;
-    if (e.state === 'charging' || e.state === 'firing') { e.state = 'idle'; e.beam = null; }
+    this.interruptEnemy(e);
     this.dirty();
   }
 
@@ -1508,7 +1595,7 @@ class HeroWorld {
     if (e.y >= rest || (e.air && !L.thrown && L.t > 0.7)) {
       if (L.thrown) { e.y = Math.min(e.y, rest); this.crash(e); return; }
       if (e.y >= rest) e.y = rest;
-      if (!e.air) { e.grounded = true; this.fx('shockwave', e.x, g, { size: e.kind === 'boss' ? 1.2 : 0.6 }); this.sound('landing', e); }
+      if (!e.air) { e.grounded = true; this.fx('shockwave', e.x, g, { size: isBoss(e) ? 1.2 : 0.6 }); this.sound('landing', e); }
       e.launch = null; e.spin = 0; e.vy = 0; e.vx *= 0.2;
       if (L.dmg) this.damage(e, L.dmg, e);
       this.dirty();
@@ -1543,7 +1630,13 @@ class HeroWorld {
     e.grabbed = h.id; e.grabbedAt = this.clock;
     e.x = x; e.y = y; e.vx = h.vx; e.vy = h.vy;
     e.stun = 0; e.charge = 0;
-    if (e.state === 'charging' || e.state === 'firing') { e.state = 'idle'; e.beam = null; }
+    this.interruptEnemy(e);
+  }
+
+  // whatever it was doing (charging, firing a beam, winding up) is cut short
+  interruptEnemy(e) {
+    if (e.beam) { this.beams = this.beams.filter((b) => b !== e.beam); e.beam = null; }
+    e.state = 'idle'; e.charge = 0;
   }
 
   count(key, n) { this.counters[key] = (this.counters[key] || 0) + (n == null ? 1 : n); }
@@ -1580,35 +1673,201 @@ class HeroWorld {
     this.fx('flash', from.x, from.y, { size: 0.6, color: '255,170,60' });
   }
 
-  tickBoss(e, dt, hc, who) {
+  // a straight bolt (Kang's chrono shots…): like the laser, but its own kind
+  enemyBolt(e, kind, from, target, speed, dmg, who, o) {
+    const hv = who || this.hero;
+    const lead = { x: target.x + hv.vx * 0.2, y: target.y + hv.vy * 0.2 };
+    const a = Math.atan2(lead.y - from.y, lead.x - from.x) + rand(-0.05, 0.05);
+    this.addShot({ kind, owner: 'enemy', x: from.x, y: from.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg, life: 3.5, bolt: true, ...(o || {}) });
+    this.sound(kind === 'timeblast' ? 'timeBlast' : 'chrono', from);
+  }
+
+  // an arcing throw (Thanos's rock…), like the tank shell
+  enemyLob(e, kind, from, target, dmg, size) {
+    const s = this.s, g = 650 * s;
+    const dx = target.x - from.x, dy = target.y - from.y;
+    const t = clamp(Math.abs(dx) / (360 * s), 0.6, 2.2);
+    this.addShot({ kind, owner: 'enemy', x: from.x, y: from.y, vx: dx / t, vy: dy / t - 0.5 * g * t, g, dmg, life: 4, size: size || 1, hitSize: 1.2 });
+    this.sound('whoosh', from);
+  }
+
+  // A villain's sustained beam: charge (e.charge 0→1), then fire for o.fire seconds, either
+  // turning toward the hero (o.turn rad/s) or sweeping through o.sweep radians across them.
+  bossBeam(e, dt, hc, from, o) {
     const s = this.s;
-    const cannon = { x: e.x + e.facing * 52 * s, y: e.y - 62 * s };
-    if (e.state === 'idle' && e.cool <= 0 && (who || this.hero).mode !== 'down') {
-      if (chance(0.55)) { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); this.say(this.hero.line('bossBeam'), 'warn'); }
-      else {
-        for (let i = 0; i < 3; i++) {
-          this.addShot({ kind: 'emissile', owner: 'enemy', x: e.x + (i - 1) * 16 * s, y: e.y - 100 * s, vx: e.facing * 60 * s + (i - 1) * 60 * s, vy: -260 * s, target: 'hero', dmg: 9, life: 5, speed: 200 * s });
-        }
-        this.sound('missile', e);
-        e.cool = rand(3.2, 4.4);
-      }
-    }
     if (e.state === 'charging') {
       e.stateT += dt;
-      e.charge = clamp(e.stateT / 1.2, 0, 1);
-      if (e.stateT >= 1.2) { e.state = 'firing'; e.stateT = 0; e.beamAng = Math.atan2(hc.y - cannon.y, hc.x - cannon.x); e.beam = this.addBeam('enemy', cannon, cannon, 1.3, 9, 'enemy'); this.sound('unibeam', e); }
-    } else if (e.state === 'firing') {
-      e.stateT += dt;
-      const want = Math.atan2(hc.y - cannon.y, hc.x - cannon.x);
-      e.beamAng += clamp(want - e.beamAng, -0.5 * dt, 0.5 * dt);
-      const end = { x: cannon.x + Math.cos(e.beamAng) * 1500 * s, y: cannon.y + Math.sin(e.beamAng) * 1500 * s };
-      if (e.beam) { e.beam.x1 = cannon.x; e.beam.y1 = cannon.y; e.beam.x2 = end.x; e.beam.y2 = end.y; }
-      e.beamTick = (e.beamTick || 0) + dt;
-      if (e.beamTick > 0.2) {
-        e.beamTick = 0;
-        for (const hh of this.heroes) { const c = hh.chest(); if (segDist(c, cannon, end) < 26 * hh.s) this.hurtHero(2.4, c, hh); }
+      e.charge = clamp(e.stateT / o.charge, 0, 1);
+      if (e.stateT >= o.charge) {
+        e.state = 'firing'; e.stateT = 0;
+        const aim = Math.atan2(hc.y - from.y, hc.x - from.x);
+        e.sweepDir = chance(0.5) ? 1 : -1;
+        e.beamAng = o.sweep ? aim - e.sweepDir * o.sweep / 2 : aim;
+        e.beam = this.addBeam(o.kind, from, from, o.fire + 0.1, o.w, 'enemy');
+        e.beam.color = o.color; e.beam.core = o.core;
+        this.sound(o.sound || 'unibeam', e);
       }
-      if (e.stateT >= 1.3) { e.state = 'idle'; e.charge = 0; e.cool = rand(2.6, 3.8); e.beam = null; }
+      return;
+    }
+    if (e.state !== 'firing') return;
+    e.stateT += dt;
+    if (o.sweep) e.beamAng += e.sweepDir * o.sweep * dt / o.fire;
+    else {
+      let dA = Math.atan2(hc.y - from.y, hc.x - from.x) - e.beamAng;
+      while (dA > Math.PI) dA -= 2 * Math.PI;
+      while (dA < -Math.PI) dA += 2 * Math.PI;
+      e.beamAng += clamp(dA, -o.turn * dt, o.turn * dt);
+    }
+    const len = (o.len || 1500) * s;
+    const end = { x: from.x + Math.cos(e.beamAng) * len, y: from.y + Math.sin(e.beamAng) * len };
+    if (e.beam) { e.beam.x1 = from.x; e.beam.y1 = from.y; e.beam.x2 = end.x; e.beam.y2 = end.y; }
+    e.beamTick = (e.beamTick || 0) + dt;
+    if (e.beamTick > 0.2) {
+      e.beamTick = 0;
+      for (const hh of this.heroes) { const c = hh.chest(); if (hh.mode !== 'down' && segDist(c, from, end) < (o.hit || 26) * hh.s) this.hurtHero(o.dmg, c, hh); }
+    }
+    if (e.stateT >= o.fire) { e.state = 'idle'; e.charge = 0; e.cool = rand(o.after[0], o.after[1]); e.beam = null; }
+  }
+
+  heroOnFloor(h) { return h.y > this.groundAt(h.x, h.y) - 40 * h.s; }
+
+  // ---- Thanos: the gauntlet beam, a ground slam up close, and a hurled rock
+  tickThanos(e, dt, hc, who) {
+    const s = this.s, h = who || this.hero, k = ENEMY.thanos;
+    const fist = { x: e.x + e.facing * 30 * s, y: e.y - 128 * s }; // the raised gauntlet
+    if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down') {
+      if (Math.abs(hc.x - e.x) < 230 * s && this.heroOnFloor(h)) { e.state = 'slam'; e.stateT = 0; this.sound('chargeLong', e); }
+      else if (chance(0.5)) { e.state = 'charging'; e.stateT = 0; this.sound('gauntlet', e); this.say(this.hero.line('bossBeam'), 'warn'); }
+      else { e.state = 'throw'; e.stateT = 0; }
+    }
+    if (e.state === 'slam') {
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.6, 0, 1);
+      if (e.stateT >= 0.6) {
+        const g = { x: e.x + e.facing * 40 * s, y: e.y };
+        this.fx('shockwave', g.x, g.y, { size: 2.4 });
+        this.sound('boomBig', g);
+        for (const hh of this.heroes) if (hh.mode !== 'down' && Math.abs(hh.x - g.x) < 280 * s && this.heroOnFloor(hh)) this.hurtHero(k.dmg, { x: hh.x, y: hh.y - 20 * s }, hh);
+        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(2.2, 3);
+      }
+    } else if (e.state === 'throw') {
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.55, 0, 1);
+      if (e.stateT >= 0.55) {
+        this.enemyLob(e, 'rock', { x: e.x - e.facing * 6 * s, y: e.y - 140 * s }, hc, 10, 1.4);
+        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(2.4, 3.2);
+      }
+    } else if (e.state === 'charging' || e.state === 'firing') {
+      this.bossBeam(e, dt, hc, fist, { charge: 1.2, fire: 1.4, w: 10, dmg: 2.4, turn: 0.55, kind: 'gauntlet', color: '190,90,255', core: 'rgba(255,240,255,0.95)', after: [k.fire[0], k.fire[1]] });
+    } else if (e.state === 'recover') {
+      e.stateT += dt;
+      if (e.stateT > 0.45) e.state = 'idle';
+    }
+  }
+
+  // ---- Doctor Doom: hovers at a distance; homing mystic bolts, a lightning beam, a force field
+  tickDoom(e, dt, hc, h, d) {
+    const s = this.s, k = ENEMY.doom;
+    const side = e.x < hc.x ? -1 : 1;
+    const want = { x: hc.x + side * e.range * s, y: hc.y - e.alt * s + Math.sin(e.phase * 1.3) * 18 * s };
+    if (e.state !== 'firing') this.steerEnemy(e, want, k.speed * s, dt, 420 * s);
+    else { e.vx *= 0.9; e.vy *= 0.9; }
+    e.facing = hc.x > e.x ? 1 : -1;
+    if (e.shield > 0) e.shield = Math.max(0, e.shield - dt);
+    else if (this.clock >= e.shieldAt) { e.shield = 2.6; e.shieldAt = this.clock + rand(9000, 12000); this.sound('shield', e); this.dirty(); }
+    const hands = { x: e.x + e.facing * 27 * s, y: e.y - 3 * s };
+    if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down' && d < 950 * s) {
+      if (chance(0.55)) {
+        for (let i = 0; i < 3; i++) {
+          this.addShot({ kind: 'mystic', owner: 'enemy', x: hands.x, y: hands.y, vx: e.facing * 140 * s + (i - 1) * 30 * s, vy: (i - 1) * 130 * s - 40 * s, homing: true, turn: 2.2, vmax: 300, dmg: k.dmg, life: 4.5, speed: 150 * s, hitFx: 'flash', hitColor: '90,255,140', hitSize: 0.8, hitSound: 'hit' });
+        }
+        this.sound('mystic', e);
+        e.cool = rand(k.fire[0], k.fire[1]) + 0.8;
+      } else { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); }
+    }
+    if (e.state === 'charging' || e.state === 'firing') {
+      this.bossBeam(e, dt, hc, hands, { charge: 0.7, fire: 1.0, w: 7, dmg: 2, turn: 1.1, kind: 'lightning', color: '90,255,140', core: 'rgba(230,255,235,0.95)', sound: 'lightning', after: [k.fire[0], k.fire[1]] });
+    }
+  }
+
+  // ---- Kang the Conqueror: steps through time portals, chrono-bolt bursts, a heavy time blast
+  tickKang(e, dt, hc, who) {
+    const s = this.s, h = who || this.hero, k = ENEMY.kang;
+    const cannon = { x: e.x + e.facing * 36 * s, y: e.y - 64 * s };
+    const close = Math.abs(hc.x - e.x) < 160 * s;
+    if (e.state === 'idle' && h.mode !== 'down' && (this.clock >= e.warpAt || (close && this.clock >= e.warpAt - 4500))) {
+      const d0 = this.geo.displayAt({ x: h.x, y: h.y - 20 * s }) || this.geo.nearestDisplay(h);
+      const lo = d0.work.x + 50 * s, hi = d0.work.x + d0.work.width - 50 * s;
+      let side = chance(0.5) ? 1 : -1;
+      let nx = clamp(h.x + side * rand(260, 460) * s, lo, hi);
+      if (Math.abs(nx - h.x) < 200 * s) { side = -side; nx = clamp(h.x + side * rand(260, 460) * s, lo, hi); }
+      this.fx('timeportal', e.x, e.y - 50 * s, { size: 2.2 });
+      e.x = nx; e.y = this.groundAt(nx, d0.work.y + d0.work.height - 5);
+      this.fx('timeportal', e.x, e.y - 50 * s, { size: 2.2 });
+      this.sound('timeWarp', e);
+      e.warpAt = this.clock + rand(6500, 9500);
+      e.warpT = now();
+      e.cool = Math.max(e.cool, 0.6);
+      this.dirty();
+    }
+    if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down') {
+      if (chance(0.7)) { e.state = 'burst'; e.stateT = 0; e.shotsLeft = 3; }
+      else { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); }
+    }
+    if (e.state === 'burst') {
+      e.stateT += dt;
+      e.charge = 0.6;
+      if (e.stateT >= 0.16) {
+        e.stateT = 0;
+        this.enemyBolt(e, 'chrono', cannon, hc, 620 * s, k.dmg, h, { hitFx: 'flash', hitColor: '80,240,255', hitSize: 0.6, hitSound: 'hit' });
+        if (--e.shotsLeft <= 0) { e.state = 'idle'; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]); }
+      }
+    } else if (e.state === 'charging') {
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.9, 0, 1);
+      if (e.stateT >= 0.9) {
+        this.enemyBolt(e, 'timeblast', cannon, hc, 300 * s, 11, h, { size: 1.8, hitFx: 'explosion', hitSize: 0.9 });
+        e.state = 'idle'; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]) + 0.6;
+      }
+    }
+  }
+
+  // ---- Galactus: towers at the side of the screen; Power Cosmic eye beams that sweep the
+  // screen, cosmic orbs from his hands, and a stomp that shakes the floor
+  tickGalactus(e, dt, hc, who) {
+    const s = this.s, h = who || this.hero, k = ENEMY.galactus;
+    const eyes = { x: e.x + e.facing * 16 * s, y: e.y - 528 * s };
+    const hand = { x: e.x + e.facing * 128 * s, y: e.y - 300 * s };
+    if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down') {
+      const r = Math.random();
+      if (r < 0.25 && this.heroOnFloor(h) && Math.abs(h.x - e.x) < 750 * s) { e.state = 'stomp'; e.stateT = 0; this.sound('chargeLong', e); }
+      else if (r < 0.65) { e.state = 'charging'; e.stateT = 0; this.sound('cosmicHum', e); this.say(this.hero.line('bossBeam'), 'warn'); }
+      else { e.state = 'orbs'; e.stateT = 0; e.shotsLeft = 4; }
+    }
+    if (e.state === 'stomp') {
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 1.0, 0, 1);
+      if (e.stateT >= 1.0) {
+        const g = { x: e.x + e.facing * 60 * s, y: e.y };
+        this.fx('shockwave', g.x, g.y, { size: 5 });
+        this.sound('boomBig', g);
+        for (const hh of this.heroes) if (hh.mode !== 'down' && this.heroOnFloor(hh) && Math.abs(hh.x - g.x) < 750 * s) this.hurtHero(8, { x: hh.x, y: hh.y - 20 * s }, hh);
+        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]);
+      }
+    } else if (e.state === 'orbs') {
+      e.stateT += dt;
+      e.charge = 0.7;
+      if (e.stateT >= 0.35) {
+        e.stateT = 0;
+        this.addShot({ kind: 'cosmic', owner: 'enemy', x: hand.x, y: hand.y, vx: e.facing * rand(80, 200) * s, vy: rand(-160, 40) * s, homing: true, turn: 1.6, vmax: 240, dmg: 7, life: 6, speed: 120 * s, size: 2, hitSize: 1 });
+        this.sound('mystic', hand);
+        if (--e.shotsLeft <= 0) { e.state = 'idle'; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]); }
+      }
+    } else if (e.state === 'charging' || e.state === 'firing') {
+      this.bossBeam(e, dt, hc, eyes, { charge: 1.5, fire: 2.4, w: 16, dmg: 3, sweep: 0.6, hit: 34, len: 2800, kind: 'cosmic', color: '200,170,255', core: 'rgba(255,250,255,0.98)', after: [k.fire[0], k.fire[1]] });
+    } else if (e.state === 'recover') {
+      e.stateT += dt;
+      if (e.stateT > 0.6) e.state = 'idle';
     }
   }
 
@@ -1618,7 +1877,8 @@ class HeroWorld {
     for (const p of [...this.shots]) {
       p.age += dt;
       let dead = p.age > p.life;
-      if (p.kind === 'missile' || p.kind === 'emissile') {
+      // homing: the hero's missiles, and enemy seekers (`homing`: Doom's bolts, Galactus's orbs)
+      if (p.kind === 'missile' || p.kind === 'emissile' || p.homing) {
         let tgt = null;
         if (p.kind === 'missile') {
           let e = p.target && this.enemies.find((x) => x.id === p.target);
@@ -1631,11 +1891,11 @@ class HeroWorld {
           let dA = want - a;
           while (dA > Math.PI) dA -= 2 * Math.PI;
           while (dA < -Math.PI) dA += 2 * Math.PI;
-          const turn = (p.kind === 'missile' ? 7 : 2.4) * dt;
+          const turn = (p.turn || (p.kind === 'missile' ? 7 : 2.4)) * dt;
           a += clamp(dA, -turn, turn);
-          p.speed = Math.min((p.kind === 'missile' ? 640 : 330) * s, (p.speed || 100 * s) + 900 * s * dt);
+          p.speed = Math.min((p.vmax || (p.kind === 'missile' ? 640 : 330)) * s, (p.speed || 100 * s) + 900 * s * dt);
           p.vx = Math.cos(a) * p.speed; p.vy = Math.sin(a) * p.speed;
-        } else { p.vy += 500 * s * dt; }
+        } else if (!p.homing) { p.vy += 500 * s * dt; }
       }
       if (p.g) p.vy += p.g * dt;
       p.x += p.vx * dt; p.y += p.vy * dt;
@@ -1661,13 +1921,14 @@ class HeroWorld {
         for (const h of heroes) {
           if (h.mode === 'down' || dist(p, h.chest()) >= 26 * h.s) continue;
           this.hurtHero(p.dmg, p, h);
-          if (p.kind !== 'laser') { this.fx('explosion', p.x, p.y, { size: 0.6 }); this.sound('boom', p); }
+          if (p.kind !== 'laser') { this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.6, color: p.hitColor }); this.sound(p.hitSound || 'boom', p); }
           dead = true;
           break;
         }
       }
-      if (!dead && p.y >= this.groundAt(p.x, p.y) && p.kind !== 'laser') {
-        this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.6 });
+      // (lasers and bolts fly on past the floor; everything else lands)
+      if (!dead && p.y >= this.groundAt(p.x, p.y) && p.kind !== 'laser' && !p.bolt) {
+        this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.6, color: p.hitColor });
         this.sound(p.hitSound || 'boom', p);
         if (p.owner === 'enemy') {
           for (const h of heroes) if (dist(p, { x: h.x, y: h.y - 30 * s }) < 50 * s) this.hurtHero(p.dmg * 0.5, p, h);
@@ -1807,9 +2068,13 @@ class HeroWorld {
       const r = Math.random();
       queue.push(r < 0.5 ? 'walker' : r < 0.78 ? 'drone' : r < 0.9 ? 'tank' : 'mini');
     }
-    // bosses arrive with the second half (spread through a huge army)
-    if (bosses > 2) for (let b = 0; b < bosses; b++) queue.splice(Math.floor(queue.length * (0.08 + 0.9 * b / bosses)), 0, 'boss');
-    else for (let b = 0; b < bosses; b++) queue.splice(Math.floor(queue.length * (0.45 + 0.4 * b)), 0, 'boss');
+    // the villains lead it: they arrive with the second half (spread through a huge army)
+    const first = Math.floor(Math.random() * BOSSES.length);
+    const villain = (b) => BOSSES[(first + b) % BOSSES.length];
+    if (bosses > 2) for (let b = 0; b < bosses; b++) queue.splice(Math.floor(queue.length * (0.08 + 0.9 * b / bosses)), 0, villain(b));
+    else for (let b = 0; b < bosses; b++) queue.splice(Math.floor(queue.length * (0.45 + 0.4 * b)), 0, villain(b));
+    // …and a legendary battle ends with Galactus himself
+    if (total >= 1000) queue[queue.length - 1] = 'galactus';
     const legion = this.allyCount(total);
     const t = this.clock;
     const huge = total >= 200;
@@ -1835,11 +2100,12 @@ class HeroWorld {
       let last = '';
       for (let i = 0; i < squad && a.queue.length && this.enemies.length < front; i++) {
         let kind = a.queue[0];
-        if (kind === 'boss' && this.enemies.filter((e) => e.kind === 'boss').length >= 2) {
-          // two mechs on the field is plenty: hold this one back a little
+        if (ENEMY[kind].giant && this.enemies.length > 6) break; // Galactus waits for the field to clear
+        if (ENEMY[kind].boss && !ENEMY[kind].giant && this.enemies.filter(isBoss).length >= 2) {
+          // two villains on the field is plenty: hold this one back a little
           a.queue.splice(Math.min(a.queue.length, 12), 0, a.queue.shift());
           kind = a.queue[0];
-          if (kind === 'boss') break;
+          if (ENEMY[kind].boss) break;
         }
         a.queue.shift();
         last = kind;
@@ -1848,20 +2114,21 @@ class HeroWorld {
         if (side === 'top') p = { x: w.x + rand(0.08, 0.92) * w.width, y: w.y + rand(70, 140) * s };
         else {
           const x = side === 'left' ? w.x + rand(12, 70) * s : w.x + w.width - rand(12, 70) * s;
-          const air = kind === 'drone' || kind === 'mini';
+          const air = ENEMY[kind].air;
           p = { x, y: air ? w.y + rand(0.15, 0.6) * w.height : w.y + w.height - 10 };
         }
-        const e = this.spawn(kind, p, { max: 75, silent: a.spawned > 0 && kind !== 'boss' });
+        const boss = ENEMY[kind].boss;
+        const e = this.spawn(kind, p, { max: 75, silent: a.spawned > 0 && !boss });
         if (e) {
-          if (side !== 'top' && !e.air) e.vx = (side === 'left' ? 1 : -1) * 40 * s;
+          if (side !== 'top' && !e.air && !ENEMY[kind].giant) e.vx = (side === 'left' ? 1 : -1) * 40 * s;
           if (side !== 'top' && e.air) e.vx = (side === 'left' ? 1 : -1) * 260 * s;
-          if (a.huge && kind !== 'boss') { e.hp *= 0.7; e.maxHp = e.hp; }
-          if (i === 0 || kind === 'boss') this.fx('portal', e.x, this.enemyCenter(e).y, {});
-          if (kind === 'boss' && a.huge) this.hero.say(this.hero.line('armyBoss'), 'warn');
+          if (a.huge && !boss) { e.hp *= 0.7; e.maxHp = e.hp; }
+          if (i === 0 && !boss) this.fx('portal', e.x, this.enemyCenter(e).y, {});
+          if (boss && a.huge) this.hero.say(this.hero.line('armyBoss'), 'warn');
         }
         a.spawned++;
       }
-      a.nextAt = t + (last === 'boss' ? 900 : a.huge ? rand(380, 620) : rand(160, 320));
+      a.nextAt = t + (ENEMY[last] && ENEMY[last].boss ? 900 : a.huge ? rand(380, 620) : rand(160, 320));
     }
     // milestones in a big battle
     if (a.huge) {
@@ -2031,8 +2298,8 @@ class HeroWorld {
     const free = h.mode !== 'held' && h.mode !== 'down';
     switch (name) {
       case 'spawn': {
-        const kind = ENEMY[a.kind] ? a.kind : 'drone';
-        if (kind === 'mini' || a.kind === 'swarm') {
+        const kind = ENEMY[ENEMY_ALIAS[a.kind] || a.kind] ? ENEMY_ALIAS[a.kind] || a.kind : 'drone';
+        if (kind === 'mini') {
           for (let i = 0; i < 6; i++) this.spawn('mini', { x: at.x + rand(-80, 80) * s, y: at.y + rand(-50, 50) * s });
         } else this.spawn(kind, at);
         break;
@@ -2172,7 +2439,7 @@ class HeroWorld {
       allies: this.allies.map((x) => this.heroSnap(x)),
       nuke: n && { id: n.id, did: n.did, x: n.x, y: n.y, start: this.wall(n.start), det: this.wall(n.det), dropAt: this.wall(n.dropAt), speed: n.speed, rMax: n.rMax, detonated: n.detonated },
       army: a && { id: a.id, did: a.did, side: a.side, total: a.total, left: a.queue.length + this.enemies.length, legion: this.allies.length, start: this.wall(a.start) },
-      enemies: this.enemies.map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y, vx: e.vx, vy: e.vy, facing: e.facing, hp: e.hp, maxHp: e.maxHp, phase: e.phase, charge: e.charge, hitAt: e.hitAt, aim: e.aim, air: e.air, born: e.born, stun: e.stun || 0, stunKind: e.stunKind || null, spin: e.spin || 0, launch: !!e.launch, grabbed: !!e.grabbed })),
+      enemies: this.enemies.map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y, vx: e.vx, vy: e.vy, facing: e.facing, hp: e.hp, maxHp: e.maxHp, phase: e.phase, charge: e.charge, hitAt: e.hitAt, aim: e.aim, air: e.air, born: e.born, stun: e.stun || 0, stunKind: e.stunKind || null, spin: e.spin || 0, launch: !!e.launch, grabbed: !!e.grabbed, state: e.state, shield: e.shield || 0, warp: e.warpT || 0, beamAng: e.state === 'firing' ? e.beamAng : null })),
       shots: this.shots.map((p) => ({ id: p.id, kind: p.kind, x: p.x, y: p.y, vx: p.vx, vy: p.vy, owner: p.owner, age: p.age, size: p.size || 1 })),
       beams: this.beams,
       hud: h.hud,
@@ -2251,6 +2518,6 @@ class IronWorld extends HeroWorld {
 }
 
 // helpers for hero subclasses (heroes/*.js)
-const util = { rand, chance, pick, clamp, lerp, dist, now, num, segDist, uid };
+const util = { rand, chance, pick, clamp, lerp, dist, now, num, segDist, uid, isBoss };
 
-module.exports = { HeroWorld, IronWorld, Hero, ENEMY, DEFAULT_IRON, SIZES, ARMY_SIZES, IRON_LINES, util };
+module.exports = { HeroWorld, IronWorld, Hero, ENEMY, ENEMY_ALIAS, BOSSES, isBoss, DEFAULT_IRON, SIZES, ARMY_SIZES, IRON_LINES, util };

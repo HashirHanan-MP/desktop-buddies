@@ -27,6 +27,7 @@
 
   function create(env) {
     const { Sprite, inB, spawn } = env;
+    const V = root.VillainArt || null; // the enemies' own drawings (villains.js)
     const enemySprites = new Map();
     const views = new Map(); // hero id -> HeroView
     let lastNuke = null;
@@ -200,13 +201,9 @@
     }
 
     // ---------------------------------------------------------------- enemies
-    const ENEMY_BOX = {
-      drone: { w: 60, h: 50, ax: 30, ay: 28 },
-      mini: { w: 30, h: 30, ax: 15, ay: 15 },
-      walker: { w: 70, h: 60, ax: 35, ay: 50 },
-      tank: { w: 90, h: 50, ax: 45, ay: 42 },
-      boss: { w: 180, h: 240, ax: 90, ay: 228 },
-    };
+    // sprite box and centre of each enemy kind (Ultron's army and the villains: villains.js)
+    const ENEMY_INFO = (V && V.INFO) || {};
+    const infoOf = (kind) => ENEMY_INFO[kind] || { box: { w: 60, h: 60, ax: 30, ay: 50 }, cy: 0, r: 22 };
 
     function renderEnemies(s, now, T) {
       const S = s.s;
@@ -215,16 +212,21 @@
       const ageOf = (e) => (now - e.born) / 1000;
       for (const e of s.enemies) {
         seen.add(e.id);
-        const box = ENEMY_BOX[e.kind];
+        const info = infoOf(e.kind);
+        const box = info.box;
         let sp = enemySprites.get(e.id);
         if (!sp) { sp = new Sprite(); enemySprites.set(e.id, sp); }
-        const cy = e.kind === 'boss' ? -62 : e.kind === 'walker' ? -24 : e.kind === 'tank' ? -13 : 0;
+        const cy = info.cy;
         // tumbling (knocked flying / thrown): a square canvas around its middle so nothing is cut off
         if (e.spin) { const m = Math.max(box.w, box.h) * 1.25; sp.size(m * S, m * S, m * S / 2, m * S / 2 - cy * S); }
         else sp.size(box.w * S, box.h * S, box.ax * S, box.ay * S);
         const k = clamp((Date.now() - s.t) / 1000, 0, 0.05);
         const x = e.x + e.vx * k, y = e.y + (e.air || e.launch ? e.vy * k : 0);
         if (!sp.place(x, y, Math.round(y) + (e.air || e.launch || e.grabbed ? 2000 : 0))) continue;
+        // the giant is a big canvas: redraw it ~20 times a second unless it was just hit
+        if (e.kind === 'galactus' && now - (sp.lastDraw || 0) < 50 && now - e.hitAt > 130 && !sp.flashed && s.lockId !== e.id) continue;
+        sp.lastDraw = now;
+        sp.flashed = now - e.hitAt < 110;
         const ctx = sp.begin();
         ctx.save();
         ctx.scale(S, S);
@@ -234,17 +236,18 @@
         A.drawEnemy(ctx, e, T);
         if (ART.drawEnemyOverlay) ART.drawEnemyOverlay(ctx, e, T, cy);
         ctx.restore();
-        if (now - e.hitAt < 110) {
+        if (sp.flashed) {
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.globalCompositeOperation = 'source-atop';
-          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          // the giant is hit almost non-stop: a fainter flash keeps him from washing out
+          ctx.fillStyle = e.kind === 'galactus' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
           ctx.fillRect(0, 0, sp.c.width, sp.c.height);
           ctx.restore();
         }
         if (s.lockId === e.id) {
           ctx.save(); ctx.scale(S, S);
-          A.reticle(ctx, 0, cy, (e.kind === 'boss' ? 56 : e.kind === 'mini' ? 12 : 22), T);
+          A.reticle(ctx, 0, cy, info.r, T);
           ctx.restore();
         }
       }
@@ -364,6 +367,7 @@
       for (const p of s.shots || []) {
         const x = p.x + p.vx * k, y = p.y + p.vy * k;
         if (!inB({ x, y }, 40)) continue;
+        if (p.owner === 'enemy' && V && V.drawShot(ctx, p, x, y, T)) continue;
         if (ART.drawShot && ART.drawShot(ctx, p, x, y, T)) continue;
         if (p.kind === 'laser') A.drawLaser(ctx, x, y, p.vx, p.vy);
         else if (p.kind === 'shell') A.drawShell(ctx, x, y, T);
@@ -379,6 +383,7 @@
         }
         const age = (Date.now() - b.start) / 1000;
         const life = clamp(1 - age / b.dur, 0, 1);
+        if (b.owner === 'enemy' && V && V.drawBeam(ctx, b, x1, y1, S, age, life, T)) continue;
         const own = b.owner !== 'enemy' && ART.beamColors ? ART.beamColors(b) : null;
         const halo = own ? own.halo : b.owner === 'enemy' ? '255,40,60' : '120,225,255';
         const core = own ? own.core : b.owner === 'enemy' ? 'rgba(255,220,220,0.95)' : null;
@@ -398,6 +403,7 @@
     function expandFx(e, S, ch) {
       const ART = artFor(ch);
       if (ART.expandFx && ART.expandFx(e, S, spawn)) return true;
+      if (V && V.expandFx(e, S, spawn)) return true;
       switch (e.kind) {
         case 'explosion': {
           const z = (e.size || 1) * S;

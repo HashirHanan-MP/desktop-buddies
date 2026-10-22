@@ -33,12 +33,14 @@
   // the hero scene (ironScene.js) draws every hero; `scene` is the character id
   const heroScene = () => scene !== 'cat' && !!iron;
   const artOf = (ch) => (window.HeroArts && window.HeroArts[ch]) || null;
-  const themeOf = (ch) => (ch === 'cat' || !artOf(ch) ? 'cat' : artOf(ch).theme);
-  const EMPTY_ENTS = { bowls: [], poops: [], scratches: [], files: [], yarns: [], boxes: [], posts: [], catnips: [], bed: null, grave: null };
+  // the standalone Desktop Cat (snapshot `extras`) has its own warm "cozy" look
+  const themeOf = (ch) => (ch === 'cat' ? (latest && latest.extras ? 'cozy' : 'cat') : !artOf(ch) ? 'cat' : artOf(ch).theme);
+  const EMPTY_ENTS = { bowls: [], poops: [], scratches: [], files: [], yarns: [], boxes: [], posts: [], catnips: [], gifts: [], bed: null, grave: null };
   api.on('state', (s) => {
     lastStateAt = Date.now();
     const ch = s.character || 'cat';
     if (ch !== scene) switchScene(ch);
+    if (ch === 'cat' && !!s.extras !== (document.body.dataset.theme === 'cozy')) document.body.dataset.theme = s.extras ? 'cozy' : 'cat';
     if (ch === 'cat') { if (s.ents) lastEnts = s.ents; else s.ents = lastEnts || EMPTY_ENTS; }
     else s.ents = EMPTY_ENTS;
     latest = s;
@@ -292,7 +294,7 @@
     const cp = c.mode === 'held' ? { x: c.x, y: c.y, z: c.z, dist: c.dist } : interp(now);
     const gx = cp.x, gy = cp.y - cp.z;
     // a compact canvas most of the time; a tall one when a bubble/card/dangling cat needs the room
-    const big = c.bubble || c.hover || c.mode !== 'task' || c.inBox || c.caught || c.carry || (c.flags && c.flags.stars) || c.expr === 'dizzy';
+    const big = c.bubble || c.hover || c.mode !== 'task' || c.inBox || c.caught || c.carry || c.carryGift || c.holding || s.focus || (c.flags && c.flags.stars) || c.expr === 'dizzy';
     if (big) catSprite.size(280 * S, 310 * S, 140 * S, 185 * S);
     else catSprite.size(190 * S, 128 * S, 95 * S, 110 * S);
     const here = inB({ x: cp.x, y: cp.y - 30 * S });
@@ -330,7 +332,7 @@
       const k = clamp((now - c.action.start) / (c.action.dur * 1000), 0, 1);
       ctx.scale(1 + 0.08 * (1 - k), 1 - 0.13 * (1 - k));
     }
-    CatArt.drawCat(ctx, pose, face, { T, palette: c.palette, eyes: c.eyes, earTwitch: earTwitch(c, now) });
+    CatArt.drawCat(ctx, pose, face, { T, palette: c.palette, eyes: c.eyes, earTwitch: earTwitch(c, now), accessory: c.accessory });
     if (c.caught) {
       // the toy mouse pinned under the front paws
       const pw = pose.paws[0];
@@ -350,6 +352,16 @@
         PROPS.file(ctx, { ...f, rot: c.facing * 0.5, name: null }, T);
         ctx.restore();
       }
+    }
+    // Desktop Cat: a gift or the caught feather lure in its mouth
+    if ((c.carryGift && PROPS.gift) || (c.holding === 'feather' && PROPS.featherLure)) {
+      const mp = CatArt.mouthPoint(pose);
+      ctx.save();
+      ctx.translate(c.facing * (mp.x + 3), mp.y + 15);
+      ctx.scale(c.facing * 0.62, 0.62);
+      if (c.carryGift) PROPS.gift(ctx, c.carryGift, T, true);
+      else PROPS.featherLure(ctx, T);
+      ctx.restore();
     }
     if (box) PROPS.boxFront(ctx);
     const hc = CatArt.headCenter(pose);
@@ -375,7 +387,9 @@
     // thought bubble / hover status card (screen-upright)
     const top = hy - hc.r - 6;
     const side = headG.x > B.x + B.width - 90 * S ? -1 : 1;
-    if (c.hover && !c.bubble) {
+    if (s.focus && !c.bubble && !c.hover) {
+      focusPill(ctx, hx, top - 8, s.focus);
+    } else if (c.hover && !c.bubble) {
       drawStatus(ctx, hx, top - 2, c.stats, c.name, c.mood, 1);
     } else if (c.bubble) {
       const age = (Date.now() - c.bubble.start) / 1000;
@@ -385,6 +399,33 @@
       drawBubble(ctx, hx + side * 4, top, c.bubble.icon, age, T, c.bubble.urgent, side);
       ctx.restore();
     }
+    ctx.restore();
+  }
+
+  // Desktop Cat's focus timer: a little tomato pill with the time left, above the napping cat
+  function focusPill(ctx, x, y, f) {
+    const left = Math.max(0, Math.ceil((f.until - Date.now()) / 1000));
+    const text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    const k = clamp(1 - left / (f.minutes * 60), 0, 1);
+    ctx.save();
+    ctx.font = '700 10px system-ui, -apple-system, "Segoe UI", sans-serif';
+    const w = ctx.measureText(text).width + 30, h = 18;
+    ctx.translate(x - w / 2, y - h);
+    ctx.fillStyle = 'rgba(255,250,242,0.96)';
+    ctx.strokeStyle = 'rgba(232,116,59,0.9)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); PropsArt.rrect(ctx, 0, 0, w, h, h / 2); ctx.fill(); ctx.stroke();
+    // progress ring around the tomato
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(232,116,59,0.25)';
+    ctx.beginPath(); ctx.arc(10, h / 2, 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#e8743b';
+    ctx.beginPath(); ctx.arc(10, h / 2, 6, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#e8463b';
+    ctx.beginPath(); ctx.arc(10, h / 2 + 0.5, 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4caf50'; ctx.fillRect(9.2, h / 2 - 4.2, 1.6, 2.2);
+    ctx.fillStyle = '#7a3b1d';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 21, h / 2 + 0.5);
     ctx.restore();
   }
 
@@ -430,6 +471,7 @@
     catnip: { w: 46, h: 48, ax: 23, ay: 40, z: -300, fps: 10 },
     file: { w: 90, h: 62, ax: 45, ay: 44, z: 0 },
     grave: { w: 80, h: 74, ax: 40, ay: 64, z: 0, fps: 2 },
+    gift: { w: 56, h: 50, ax: 28, ay: 38, z: 0, fps: 6 },
     scratch: { w: 88, h: 88, ax: 44, ay: 44, z: 300000 },
   };
   const entSprites = new Map();
@@ -502,6 +544,19 @@
       });
     }
     if (E.grave) ent(seen, 'g' + E.grave.id, 'grave', E.grave.x, E.grave.y, S, 'g' + E.grave.flowers, (c) => PROPS.tombstone(c, E.grave, T));
+    // Desktop Cat: gifts the cat brought (click to collect)
+    for (const g of E.gifts || []) {
+      const hov = near(g, 18, 16, 8);
+      ent(seen, 'gf' + g.id, 'gift', g.x, g.y, S, `${hov}`, (c) => {
+        c.save();
+        c.translate(0, -8);
+        c.beginPath(); c.ellipse(0, 0, hov ? 22 : 18, hov ? 15 : 12, 0, 0, Math.PI * 2);
+        c.fillStyle = hov ? 'rgba(232,116,59,0.22)' : `rgba(255,214,120,${0.12 + 0.1 * Math.sin(T * 4)})`;
+        c.fill();
+        c.restore();
+        if (PROPS.gift) PROPS.gift(c, g.kind, T);
+      });
+    }
     for (const sc of E.scratches) {
       const hot = tool === 'repair' && !sc.fixing;
       const hov = hot && Math.hypot((cur.x - sc.x) / (24 * sc.size), (cur.y - sc.y) / (26 * sc.size)) <= 1;
@@ -536,6 +591,12 @@
         case 'crumb': p.vx = (Math.random() - 0.5) * 70 * S; p.vy = (-40 - Math.random() * 50) * S; p.g = 320 * S; p.life = 0.55; break;
         case 'fur': p.vx = (Math.random() - 0.5) * 50 * S; p.vy = (-20 - Math.random() * 30) * S; p.g = 18 * S; p.life = 1.5; p.vr = (Math.random() - 0.5) * 4; break;
         case 'paper': p.vx = (Math.random() - 0.5) * 120 * S; p.vy = (-50 - Math.random() * 60) * S; p.g = 260 * S; p.life = 1; p.vr = (Math.random() - 0.5) * 14; break;
+        case 'confetti': {
+          const sp = (120 + Math.random() * 160) * S, up = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
+          p.vx = Math.cos(up) * sp; p.vy = Math.sin(up) * sp; p.g = 300 * S; p.life = 1.6; p.vr = (Math.random() - 0.5) * 16;
+          p.color = p.color || ['#e8743b', '#ffcf4a', '#4cc38a', '#4aa8ff', '#ff6fa8', '#a77bff'][i % 6];
+          break;
+        }
         case 'text': p.vy = -32 * S; p.life = 1.3; break;
         case 'zzz': p.vx = (8 + Math.random() * 6) * S; p.vy = -20 * S; p.life = 2.2; break;
         case 'note': p.vx = (Math.random() - 0.5) * 20 * S; p.vy = -25 * S; p.life = 1.6; break;
@@ -616,7 +677,7 @@
     const cur = s.cursor;
     const curHere = inB(cur, 40);
     const mine = particles.filter((p) => !p.inCat && inB(p, 60));
-    const showTool = tool && curHere && !(tool === 'mouse' && s.toyCaught);
+    const showTool = tool && curHere && !((tool === 'mouse' || tool === 'feather') && s.toyCaught);
     renderTool(showTool ? tool : null, cur, s, T, dt);
     const ironFx = heroScene() && iron.fxBusy(s);
     if (!mine.length && !ironFx) {
@@ -786,8 +847,8 @@
     group('EPIC BATTLES', [['epic', '200 · EPIC'], ['legendary', '1000 · LEGENDARY']], 'size');
     const legion = { small: 2, medium: 3, large: 5 }[dialog.size] || 7;
     el.appendChild(txt('div', 'brief-quip', dialog.notes ? dialog.notes[dialog.size] || '' : dialog.size === 'legendary'
-      ? 'All 7 suits of the Iron Legion join the fight, and replacements fly in when one goes down. About 4 minutes of war.'
-      : dialog.size === 'epic' ? 'All 7 suits of the Iron Legion join the fight. Heavy mechs in every wave.'
+      ? 'All 7 suits of the Iron Legion join the fight, and replacements fly in when one goes down. Galactus comes last.'
+      : dialog.size === 'epic' ? 'All 7 suits of the Iron Legion join the fight. Thanos, Doom and Kang lead the waves.'
         : `Iron Man will call ${legion} more suits from the Iron Legion.`));
     const row = txt('div', 'brief-btns');
     const go = txt('button', 'primary', 'LAUNCH ATTACK');
@@ -843,9 +904,14 @@
       b.addEventListener('click', (e) => { e.stopPropagation(); api.send('cmd', { name: cmd, args: { id: a.id, ...(args || {}) } }); });
       row.appendChild(b);
     };
-    btn(words ? words.done : 'Done ✓', 'reminderDone', null, true);
-    btn(words ? words.snooze(5) : 'Snooze 5 min', 'reminderSnooze', { minutes: 5 });
-    btn(words ? words.snooze(15) : '15 min', 'reminderSnooze', { minutes: 15 });
+    if (a.buttons) {
+      // an announcement with its own choices (Desktop Cat's focus break)
+      for (const [label, cmd, args, primary] of a.buttons) btn(label, cmd, args, primary);
+    } else {
+      btn(words ? words.done : 'Done ✓', 'reminderDone', null, true);
+      btn(words ? words.snooze(5) : 'Snooze 5 min', 'reminderSnooze', { minutes: 5 });
+      btn(words ? words.snooze(15) : '15 min', 'reminderSnooze', { minutes: 15 });
+    }
     el.appendChild(row);
   }
 
@@ -930,7 +996,7 @@
     if (c.dead && c.ghost && inB(c.ghost, 200 * S)) return true;
     if (particles.length || (s.tool && inB(s.cursor, 60))) return true;
     const E = s.ents;
-    for (const k of ['bowls', 'poops', 'scratches', 'files', 'yarns', 'boxes', 'posts', 'catnips']) for (const e of E[k]) if (inB(e, 80 * S)) return true;
+    for (const k of ['bowls', 'poops', 'scratches', 'files', 'yarns', 'boxes', 'posts', 'catnips', 'gifts']) for (const e of E[k] || []) if (inB(e, 80 * S)) return true;
     return !!((E.bed && inB(E.bed, 80)) || (E.grave && inB(E.grave, 80)));
   }
   function wantFps() {

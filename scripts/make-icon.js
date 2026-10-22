@@ -10,6 +10,7 @@ const HEROES = ['homelander', 'hulk', 'spiderman'];
 
 const html = `<!doctype html><html><body style="margin:0;background:transparent">
 <script src="../src/renderer/catArt.js"></script>
+<script src="../src/renderer/props.js"></script>
 <script src="../src/renderer/ironArt.js"></script>
 ${HEROES.map((h) => `<script src="../src/renderer/heroes/${h}.js"></script>`).join('\n')}
 <script>
@@ -74,8 +75,12 @@ ${HEROES.map((h) => `<script src="../src/renderer/heroes/${h}.js"></script>`).jo
     out['icon-ironman.png'] = c;
   }
 
-  // ---- the other heroes draw their own
-  for (const id of ${JSON.stringify(HEROES)}) {
+  // ---- the standalone Desktop Cat: its own tabby logo
+  if (CatArt.drawEditionIcon) { const c = canvas(1024); CatArt.drawEditionIcon(c.getContext('2d'), 1024); out['icon-desktopcat.png'] = c; }
+  if (CatArt.drawEditionTray) { const c = canvas(64); CatArt.drawEditionTray(c.getContext('2d'), 64); out['tray-desktopcat.png'] = c; }
+
+  // ---- the heroes draw their own (Iron Man's can replace the bust above)
+  for (const id of ['ironman', ...${JSON.stringify(HEROES)}]) {
     const A = window.HeroArts && HeroArts[id];
     if (A && A.drawIcon) { const c = canvas(1024); A.drawIcon(c.getContext('2d'), 1024); out['icon-' + id + '.png'] = c; }
     if (A && A.drawTray) { const c = canvas(64); A.drawTray(c.getContext('2d'), 64); out['tray-' + id + '.png'] = c; }

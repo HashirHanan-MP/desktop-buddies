@@ -10,7 +10,7 @@
   let isOpen = false, origin = null, info = null, bounds = null, getState = null, menuId = 0;
   let hoverTimer = null, closeTimer = null, meterTimer = null, lastInside = 0;
 
-  const TOOL_LABEL = { scoop: 'Poop scoop', repair: 'Repair spray', brush: 'Brush', mouse: 'Mouse chase', laser: 'Laser pointer', treat: 'Treat in hand' };
+  const TOOL_LABEL = { scoop: 'Poop scoop', repair: 'Repair spray', brush: 'Brush', mouse: 'Mouse chase', laser: 'Laser pointer', treat: 'Treat in hand', feather: 'Feather wand' };
   const CHAR_ICON = { cat: '🐱', ironman: '🦾', homelander: '🦅', hulk: '👊', spiderman: '🕷️' };
   const isHero = (s) => s.character !== 'cat';
   const artOf = (ch) => (root.HeroArts && root.HeroArts[ch]) || root.HeroArts.ironman;
@@ -47,11 +47,15 @@
     out.push({
       icon: '🎯', label: 'Deploy enemy', badge: n || null, hint: 'right here',
       sub: [
-        { icon: '🛸', label: 'Flying drone', cmd: 'spawn', args: { kind: 'drone' } },
-        { icon: '🤖', label: 'Ground walker', cmd: 'spawn', args: { kind: 'walker' } },
-        { icon: '🛞', label: 'Tank', cmd: 'spawn', args: { kind: 'tank' } },
-        { icon: '🐝', label: 'Drone swarm', cmd: 'spawn', args: { kind: 'swarm' }, hint: '6 kamikaze minis' },
-        { icon: '👾', label: 'Heavy mech (boss)', cmd: 'spawn', args: { kind: 'boss' }, hint: 'big trouble' },
+        { icon: '🛸', label: 'Ultron sentry', cmd: 'spawn', args: { kind: 'drone' }, hint: 'flying' },
+        { icon: '🤖', label: 'Ultron soldier', cmd: 'spawn', args: { kind: 'walker' } },
+        { icon: '🦾', label: 'Ultron heavy', cmd: 'spawn', args: { kind: 'tank' }, hint: 'cannon arm' },
+        { icon: '🐝', label: 'Ultron swarm', cmd: 'spawn', args: { kind: 'swarm' }, hint: '6 kamikaze drones' },
+        '-',
+        { icon: '💎', label: 'Thanos', cmd: 'spawn', args: { kind: 'thanos' }, hint: 'boss · Infinity Gauntlet' },
+        { icon: '🟢', label: 'Doctor Doom', cmd: 'spawn', args: { kind: 'doom' }, hint: 'boss · mystic bolts, force field' },
+        { icon: '⏳', label: 'Kang the Conqueror', cmd: 'spawn', args: { kind: 'kang' }, hint: 'boss · time portals' },
+        { icon: '🪐', label: 'Galactus', cmd: 'spawn', args: { kind: 'galactus' }, hint: 'giant boss · Power Cosmic' },
         '-',
         { icon: '🧹', label: n ? `Clear all enemies (${n})` : 'No enemies', cmd: 'clearEnemies', disabled: !n },
       ],
@@ -121,8 +125,10 @@
         { icon: '📦', label: 'Cardboard box', cmd: 'box' },
         { icon: '🌿', label: 'Catnip', cmd: 'catnip', hint: 'silly time' },
         { icon: '🪮', label: tool === 'brush' ? 'Put brush away' : 'Brush fur', cmd: 'brush', hint: 'stroke the cat', checked: tool === 'brush' },
+        ...(s.extras ? [{ icon: '🪶', label: tool === 'feather' ? 'Put the feather away' : 'Feather wand', cmd: 'feather', hint: 'dangle it — it leaps!', checked: tool === 'feather', disabled: !!s.focus }] : []),
       ],
     });
+    if (s.extras) out.push(...extraItems(s));
     out.push({
       icon: '🛠️', label: 'Fix the screen', badge: scratches + files || null,
       sub: [
@@ -148,6 +154,34 @@
         { icon: '⏻', label: `Quit ${appName()}`, cmd: 'quit', danger: true },
       ],
     });
+    return out;
+  }
+
+  // Desktop Cat: the outfits (unlocked by bond level) and the focus timer
+  function extraItems(s) {
+    const level = s.progress ? s.progress.level : 1;
+    const acc = (root.CatArt && CatArt.ACCESSORIES) || {};
+    const keys = Object.keys(acc);
+    const out = [];
+    out.push({
+      icon: '👗', label: 'Dress up', hint: `level ${level}`,
+      sub: [
+        ...keys.map((k, i) => (level >= i + 1
+          ? { icon: acc[k].emoji, label: acc[k].label, cmd: 'wear', args: { item: k }, checked: s.cat.accessory === k }
+          : { icon: '🔒', label: acc[k].label, hint: `unlocks at level ${i + 1}`, disabled: true })),
+        '-',
+        { icon: '🚫', label: 'No outfit', cmd: 'wear', args: { item: 'none' }, checked: !s.cat.accessory },
+      ],
+    });
+    if (s.focus) {
+      const left = Math.max(1, Math.ceil((s.focus.until - Date.now()) / 60000));
+      out.push({ icon: '🍅', label: 'Stop focusing', cmd: 'focusStop', hint: `${left} min left`, accent: true });
+    } else {
+      out.push({
+        icon: '🍅', label: 'Focus timer', hint: `${s.cat.name} naps while you work`,
+        sub: [15, 25, 50].map((m) => ({ icon: '⏱️', label: `${m} minutes`, cmd: 'focus', args: { minutes: m }, hint: m === 25 ? 'one pomodoro' : '' })),
+      });
+    }
     return out;
   }
 
@@ -226,7 +260,9 @@
     h.appendChild(av);
     drawAvatar(av, s, d);
     const txt = el('div', 'htx');
-    txt.appendChild(el('div', 'name', c.name));
+    const nm = el('div', 'name', c.name);
+    if (s.extras && s.progress && !c.dead) nm.appendChild(el('span', 'lvl', `Lv ${s.progress.level}`));
+    txt.appendChild(nm);
     txt.appendChild(el('div', 'mood', c.dead ? 'resting in peace 🌈' : c.mood));
     h.appendChild(txt);
     return h;
@@ -246,7 +282,7 @@
     const pose = CatArt.makePose('sitFront', { t: T, T, phase: 0, m: {} });
     const c = s.cat;
     const face = c.dead ? { eyes: 'closed', mouth: 'w' } : c.stats.food < 25 ? { eyes: 'sad', open: 0.8, mouth: 'frown', brows: 'sad' } : c.sleeping ? { eyes: 'closed' } : { eyes: 'normal', open: 1, mouth: 'w', blush: 0.3 };
-    CatArt.drawCat(x, pose, face, { T, palette: c.palette, eyes: c.eyes });
+    CatArt.drawCat(x, pose, face, { T, palette: c.palette, eyes: c.eyes, accessory: c.accessory });
     x.restore();
   }
 
@@ -320,7 +356,7 @@
     lastInside = Date.now();
     const hero = isHero(s);
     panel = el('div', 'menu' + (hero ? ' hero' : ''));
-    panel.dataset.theme = hero ? artOf(s.character).theme : 'cat';
+    panel.dataset.theme = hero ? artOf(s.character).theme : s.extras ? 'cozy' : 'cat';
     panel.appendChild(header(s));
     if (hero || !s.cat.dead) panel.appendChild(meters(s));
     const list = el('div', 'list');

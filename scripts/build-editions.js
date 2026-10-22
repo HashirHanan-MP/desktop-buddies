@@ -1,7 +1,7 @@
 // Builds a separate app for each edition (src/main/editions.js):
 //   node scripts/build-editions.js [--win|--mac|--linux] [--x64] [edition ...]
-// With no editions given it builds the single-character apps: cat, homelander, hulk, spiderman.
-// `all` is the full Desktop Buddies (every character), `ironman` a Desktop Iron Man.
+// With no editions given it builds the single-character apps: cat, ironman, homelander, hulk, spiderman.
+// `all` is the full Desktop Buddies (every character).
 // Each one gets its own name, app id, icon and save folder; output goes to dist/<edition>/.
 'use strict';
 const { spawnSync } = require('child_process');
@@ -16,7 +16,7 @@ const platform = args.find((a) => ['--win', '--mac', '--linux'].includes(a))
   || { win32: '--win', darwin: '--mac', linux: '--linux' }[process.platform];
 const x64Only = args.includes('--x64');
 const ids = args.filter((a) => !a.startsWith('--'));
-const editions = ids.length ? ids : ['cat', 'homelander', 'hulk', 'spiderman'];
+const editions = ids.length ? ids : ['cat', 'ironman', 'homelander', 'hulk', 'spiderman'];
 
 for (const id of editions) {
   if (!EDITIONS[id]) { console.error(`unknown edition "${id}" (known: ${Object.keys(EDITIONS).join(', ')})`); process.exit(1); }

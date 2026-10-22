@@ -1025,7 +1025,8 @@
   // a cocoon of web over a webbed enemy
   function drawEnemyOverlay(ctx, e, T, cy) {
     if (!(e.stun > 0) || e.stunKind !== 'web') return;
-    const r = { boss: 46, tank: 22, walker: 17, drone: 15, mini: 10 }[e.kind] || 14;
+    const V = window.VillainArt && window.VillainArt.INFO[e.kind];
+    const r = { tank: 22, walker: 17, drone: 15, mini: 10 }[e.kind] || (V ? V.r : 14);
     const a = clamp(e.stun / 0.6, 0, 1);
     ctx.save();
     ctx.globalAlpha *= a;

@@ -14,8 +14,8 @@
  * hurt or poked lowers it, and a low rating makes him faster and meaner.
  * He fights alone — no allies, ever.
  */
-const { Hero, util } = require('../ironman');
-const { rand, chance, clamp, dist, num, segDist } = util;
+const { Hero, ENEMY, util } = require('../ironman');
+const { rand, chance, clamp, dist, num, segDist, isBoss } = util;
 
 const TOUGH = 0.45; // share of incoming damage that actually lands
 const LOOKS = [['classic', 'Classic (flag cape)'], ['midnight', 'Midnight ops'], ['gala', 'White gala suit']];
@@ -267,7 +267,7 @@ class HomelanderHero extends Hero {
       beam.x1 = f.x; beam.y1 = f.y; beam.x2 = end.x; beam.y2 = end.y;
       for (const e of [...w.enemies]) {
         const c = w.enemyCenter(e);
-        if (segDist(c, f, end) < (14 + (e.kind === 'boss' ? 40 : 12)) * s) w.damage(e, 46 * this.dt * this.dmgMul(), f, true);
+        if (segDist(c, f, end) < (14 + (isBoss(e) ? Math.max(40, ENEMY[e.kind].r - 20) : 12)) * s) w.damage(e, 46 * this.dt * this.dmgMul(), f, true);
       }
       if (t - burnAt > 0.08 && L < 1700 * s) { burnAt = t; w.fx('heatHit', end.x, end.y, { burn: 1 }); }
       this.heat = 1;
@@ -336,7 +336,7 @@ class HomelanderHero extends Hero {
       const ch = this.chest();
       for (const e of [...w.enemies]) {
         if (hit[e.id] || e.grabbed) continue;
-        if (dist(w.enemyCenter(e), ch) < (30 + (e.kind === 'boss' ? 40 : 14)) * s) {
+        if (dist(w.enemyCenter(e), ch) < (30 + (isBoss(e) ? Math.max(40, ENEMY[e.kind].r - 20) : 14)) * s) {
           hit[e.id] = 1;
           w.damage(e, 6 * this.dmgMul(), ch);
           if (e.hp > 0) w.launchEnemy(e, dir.x * 620 * s, Math.min(-200, dir.y * 400) * s, { dmg: 1 });
@@ -738,7 +738,7 @@ class HomelanderHero extends Hero {
   // ------------------------------------------------------------ combat
   * taskCombat() {
     const w = this.w, s = this.s;
-    this.say(w.enemies.some((e) => e.kind === 'boss') ? this.line('heavyThreat') : this.line('threat'), 'warn');
+    this.say(w.enemies.some(isBoss) ? this.line('heavyThreat') : this.line('threat'), 'warn');
     w.sound('voughtSting', this);
     let engaged = 0;
     while (w.enemies.length) {
@@ -757,7 +757,7 @@ class HomelanderHero extends Hero {
       // get into position: above and to the side, eyes on the target
       const dx = this.x - tc.x;
       const side = Math.abs(dx) < 40 * s ? (chance(0.5) ? 1 : -1) : Math.sign(dx);
-      const range = (target.kind === 'boss' ? 360 : army ? 300 : 250) * s;
+      const range = (ENEMY[target.kind].giant ? 480 : isBoss(target) ? 360 : army ? 300 : 250) * s;
       if (this.mode !== 'air') yield* this.takeOff(rand(110, 190));
       if (!w.enemies.includes(target)) continue;
       {
@@ -774,7 +774,7 @@ class HomelanderHero extends Hero {
       const t2 = w.enemyCenter(target);
       const dd = dist(t2, this.chest());
       const inLine = w.enemiesInCone(this, t2, 0.25).length;
-      if (this.cd.sweep <= 0 && this.power >= 20 && (target.kind === 'boss' || inLine >= 3 || w.enemies.length >= 5 || army) && engaged > 1) {
+      if (this.cd.sweep <= 0 && this.power >= 20 && (isBoss(target) || inLine >= 3 || w.enemies.length >= 5 || army) && engaged > 1) {
         yield* this.heatSweep(t2);
       } else if (this.cd.ram <= 0 && inLine >= 2 && chance(0.55)) {
         yield* this.ram(target);
@@ -1017,7 +1017,7 @@ HomelanderHero.REMINDER = {
 HomelanderHero.UI = {
   title: 'America\'s #1 superhero',
   quick: [['🦅', 'Patrol', 'patrol'], ['💨', 'Fly-by', 'flyby'], ['👋', 'Wave', 'wave'], ['📸', 'Pose', 'pose'], ['🎤', 'Press conf.', 'pr'], ['🔥', 'Heat sweep', 'attack', { kind: 'sweep' }], ['❤️', 'Heal', 'repair'], ['👀', 'Rest eyes', 'recharge']],
-  stats: [['kills', 'threats down'], ['drones', 'drones'], ['walkers', 'walkers'], ['tanks', 'tanks'], ['bosses', 'heavy mechs'], ['armiesWon', 'armies beaten (alone)'], ['nukes', 'nukes shrugged off'], ['waves', 'waves cleared'], ['heatZaps', 'heat-vision zaps'], ['sweeps', 'heat sweeps'], ['punches', 'super punches'], ['throws', 'things thrown'], ['rams', 'flying rams'], ['claps', 'sonic claps'], ['reboots', 'knockdowns']],
+  stats: [['kills', 'threats down'], ['drones', 'Ultron drones'], ['walkers', 'Ultron soldiers'], ['tanks', 'Ultron heavies'], ['bosses', 'villains beaten'], ['thanos', 'Thanos'], ['doom', 'Doctor Doom'], ['kang', 'Kang'], ['galactus', 'Galactus'], ['armiesWon', 'armies beaten (alone)'], ['nukes', 'nukes shrugged off'], ['waves', 'waves cleared'], ['heatZaps', 'heat-vision zaps'], ['sweeps', 'heat sweeps'], ['punches', 'super punches'], ['throws', 'things thrown'], ['rams', 'flying rams'], ['claps', 'sonic claps'], ['reboots', 'knockdowns']],
   looks: {
     key: 'homelanderLook',
     options: [
@@ -1031,7 +1031,7 @@ HomelanderHero.UI = {
       : 'Homelander fights alone — heat vision, punches and whatever he can throw.'),
   help: [
     ['🖱️ The menu', 'Right-click anywhere (or on Homelander) for his menu. The tray icon and <b class="sc"></b> work too.'],
-    ['🎯 Enemies', '<i>Deploy enemy</i> drops a drone, walker, tank, swarm or a heavy mech where you right-clicked. He engages automatically; click an enemy to make it his priority.'],
+    ['🎯 Enemies', '<i>Deploy enemy</i> drops Ultron\'s robots (sentry, soldier, heavy, swarm) or a supervillain — Thanos, Doctor Doom, Kang, or the giant Galactus — where you right-clicked. He engages automatically; click an enemy to make it his priority.'],
     ['👀 Heat vision', 'Quick red zaps from his eyes, or a long <i>heat-vision sweep</i> that cuts through every enemy in front of him — that\'s how he handles an army on his own.'],
     ['👊 Strength', 'A <i>super punch</i> sends things flying, the <i>flying ram</i> plows through a line of them, a <i>sonic clap</i> knocks back and stuns everything close, and he can <i>grab</i> a tank and throw it into the others.'],
     ['⭐ Approval', 'His public approval rating rises when he wins, waves or poses, and drops when he gets hurt — or when you keep poking him. Below 35% he gets faster and meaner. A <i>press conference</i> fixes everything.'],

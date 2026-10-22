@@ -166,7 +166,9 @@ class Hero {
 
   interrupt(gen, name, prio) {
     if (this.mode === 'held' || this.mode === 'down') return false;
-    if (this.task && prio < this.taskPrio) return false;
+    // a fight that's already won (only the victory pose left) doesn't block new orders
+    const won = this.taskName === 'combat' && !this.w.enemies.length;
+    if (this.task && prio < this.taskPrio && !won) return false;
     this.run(gen, name, prio);
     return true;
   }

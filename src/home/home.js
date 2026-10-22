@@ -135,6 +135,7 @@
     const key = JSON.stringify(list.map((c) => c.id));
     const box = $('#switcher');
     box.style.display = list.length > 1 ? '' : 'none';
+    box.classList.toggle('many', list.length > 3);
     if (key === switchKey) return;
     switchKey = key;
     box.innerHTML = '';

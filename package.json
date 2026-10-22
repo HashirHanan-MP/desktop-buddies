@@ -2,19 +2,27 @@
   "name": "desktop-buddies",
   "productName": "Desktop Buddies",
   "version": "2.1.0",
-  "description": "Desktop companions \u2014 a little white cat and an armored hero \u2014 that live on your screen.",
+  "description": "Desktop companions — a little white cat, Iron Man, Homelander, Hulk and Spider-Man — that live on your screen.",
   "main": "src/main/main.js",
   "author": "Desktop Buddies",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "start:cat": "electron . --edition=cat",
+    "start:homelander": "electron . --edition=homelander",
+    "start:hulk": "electron . --edition=hulk",
+    "start:spiderman": "electron . --edition=spiderman",
     "test": "node dev/sim-test.js && node dev/geo-test.js && node dev/iron-test.js",
     "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux",
+    "editions": "node scripts/build-editions.js",
+    "editions:win": "node scripts/build-editions.js --win",
+    "editions:mac": "node scripts/build-editions.js --mac",
+    "editions:linux": "node scripts/build-editions.js --linux"
   },
   "build": {
     "appId": "app.desktopbuddies",
@@ -25,14 +33,13 @@
     },
     "files": [
       "src/**/*",
-      "build/icon.png",
-      "build/tray-cat.png",
-      "build/tray-ironman.png",
+      "build/*.png",
       "package.json"
     ],
     "asarUnpack": [
       "**/node_modules/uiohook-napi/**"
     ],
+    "npmRebuild": false,
     "mac": {
       "category": "public.app-category.entertainment",
       "target": [

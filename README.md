@@ -1,19 +1,40 @@
-# 🐱🦾 Desktop Buddies
+# 🐱🦾🦅👊🕷️ Desktop Buddies
 
 Little companions that live on your desktop — on **Windows, macOS and Linux**.
-Pick a character from the menu, the tray icon or the home window:
 
 - **Cat** — a small white cat with needs, moods and a mess to clean up.
 - **Iron Man** — an armored hero who lives on the floor of your screens, flies,
   and fights the enemies you drop on him.
+- **Homelander** — flies like he owns the place, burns enemies with heat vision.
+- **Hulk** — can't fly, so he leaps; smashes, claps and throws things.
+- **Spider-Man** — swings on webs from the top of your screen and webs enemies up.
 
-Both live on top of everything (on every monitor) while you keep working
-underneath, and both can **remind you of things**: at the time you set, your
+They live on top of everything (on every monitor) while you keep working
+underneath, and they can all **remind you of things**: at the time you set, your
 buddy comes to the middle of the main screen and tells you what to do.
 
 Everything is drawn in code and every sound is synthesized — there are no image
-or audio assets. (Iron Man here is an original fan-made drawing for personal
-use; the character belongs to Marvel. If you publish this widely, rename him.)
+or audio assets. (Iron Man, Homelander, Hulk and Spider-Man here are original
+fan-made drawings for personal use; the characters belong to Marvel and to
+Amazon / The Boys. If you publish this widely, rename them.)
+
+## 📦 Editions — one app per character
+
+The same code builds several separate apps. Each has its own name, icon, tray
+icon and save, so you can install any of them (or several side by side):
+
+| App | Character | Build |
+|---|---|---|
+| **Desktop Cat** | the cat | `node scripts/build-editions.js cat` |
+| **Desktop Homelander** | Homelander | `node scripts/build-editions.js homelander` |
+| **Desktop Hulk** | Hulk | `node scripts/build-editions.js hulk` |
+| **Desktop Spider-Man** | Spider-Man | `node scripts/build-editions.js spiderman` |
+| **Desktop Buddies** | all five, switch from the menu | `node scripts/build-editions.js all` |
+
+`npm run editions` builds the four single-character apps for the current OS
+(add `--win`, `--mac` or `--linux`, and `--x64` to skip arm64). Installers land in
+`dist/<edition>/`. To try one without building: `npm run start:hulk` (or
+`start:cat`, `start:homelander`, `start:spiderman`) — each keeps its own save.
 
 ## 🐱 The cat
 
@@ -76,15 +97,19 @@ Accessibility. On Windows and Linux no permission is needed.
 ## Build installers
 
 ```bash
-npm run dist:mac     # .dmg + .zip   (on a Mac)
-npm run dist:win     # .exe installer + portable .exe (on Windows)
-npm run dist:linux   # .AppImage + .deb (on Linux)
+npm run icon                                  # (re)draw every app & tray icon into build/
+node scripts/build-editions.js --win --x64    # Desktop Cat / Homelander / Hulk / Spider-Man
+node scripts/build-editions.js all            # the all-in-one Desktop Buddies
 ```
 
-The GitHub Actions workflow (`.github/workflows/build.yml`) builds all three:
-push a tag like `v2.0.0` or run it manually, then download the installers from
-the run's *Artifacts*. Builds are unsigned (macOS: right-click → *Open* the first
-time; Windows: SmartScreen may ask to confirm).
+Per platform: `.exe` installer + portable `.exe` on Windows, `.dmg` + `.zip` on a
+Mac, `.AppImage` + `.deb` on Linux. `npm run dist:win` (etc.) still builds the plain
+all-in-one app with the settings in package.json.
+
+The GitHub Actions workflow (`.github/workflows/build.yml`) builds every edition on
+all three systems: push a tag like `v3.0.0` or run it manually, then download the
+installers from the run's *Artifacts*. Builds are unsigned (macOS: right-click →
+*Open* the first time; Windows: SmartScreen may ask to confirm).
 
 ## Controls
 
@@ -115,17 +140,20 @@ time; Windows: SmartScreen may ask to confirm).
 ```
 src/main/main.js       Electron main: overlays per display, click-through, tray, menu, IPC,
                        character switching, reminders, saving (+ import from "Desktop Cat")
+src/main/editions.js   Which app this is (Desktop Buddies / Cat / Homelander / Hulk / Spider-Man)
 src/main/world.js      Cat simulation: needs, generator "tasks" brain, entities, tools
-src/main/ironman.js    Hero simulation: flight physics, floor per screen, enemy AI,
-                       projectiles, beams, damage, power, reboot, nuke, armies, Iron Legion
+src/main/ironman.js    Hero world: floor per screen, enemy AI, projectiles, beams, damage,
+                       stun / knock-back / grab, nuke, armies, allies — plus Iron Man himself
+src/main/heroes/       Homelander, Hulk, Spider-Man: Hero subclasses (moves, weapons, lines, UI)
 src/main/reminders.js  Reminder scheduling (once / daily / weekdays / weekends, snooze)
 src/main/geometry.js   Multi-monitor union, clamping, routing across screen edges
 src/main/sysinfo.js    CPU / memory / uptime for the hero's diagnostics
 src/main/hook.js       Optional global mouse/keyboard hook (uiohook-napi, listen-only)
 src/renderer/catArt.js    Procedural cat: skeleton, 27 blended poses, faces
 src/renderer/ironArt.js   Procedural armored hero (21 poses, 2-bone IK), enemies, beams, explosions, nuke
+src/renderer/heroes/      Procedural Homelander, Hulk, Spider-Man (poses, looks, effects, sounds, icons)
 src/renderer/overlay.js   Draws the world as depth-sorted sprites; briefing & diagnostics panels
-src/renderer/ironScene.js Hero / enemy / projectile rendering
+src/renderer/ironScene.js Hero / enemy / projectile rendering for whichever hero is out
 src/renderer/menu.js      Right-click menu for each character
 src/renderer/sound.js     Synthesized sounds + text-to-speech for reminders
 src/home/                 Home window (Cat Home / HQ), reminders editor
@@ -136,7 +164,11 @@ src/home/                 Home window (Cat Home / HQ), reminders editor
 - `npm test` — headless cat, multi-monitor and hero/combat/army/nuke/reminder tests
   (including a full 1000-unit battle).
 - `dev/gallery.html` — every pose, face, prop, hero pose and enemy (serve the folder,
-  e.g. `python3 -m http.server`, then open `/dev/gallery.html?mode=iron`).
+  e.g. `python3 -m http.server`, then open `/dev/gallery.html?mode=iron`, or
+  `?mode=hero&hero=hulk`). `npx electron dev/shot.js "dev/gallery.html?mode=hero&hero=spiderman" out.png`
+  saves it as a PNG without opening a window.
+- `node dev/capture.js <edition> <dir> [commands…]` runs the real app with a throwaway save
+  and saves screenshots.
 - `npm run dev` with `CAT_CMD_FILE=/tmp/cmd.txt` drives the app from a file
   (`character {"name":"ironman"}`, `spawn {"kind":"boss","x":900,"y":400}`,
   `reminderAdd {"inMinutes":0,"text":"Test"}`, `capture {"dir":"/tmp"}` …) — see `devPoll`.
@@ -144,6 +176,6 @@ src/home/                 Home window (Cat Home / HQ), reminders editor
 
 ## Ideas for later
 
-More characters, kitten → adult growth, sitting on top of windows, reacting to
+More characters (a Venom, a Thor…), kitten → adult growth, sitting on top of windows, reacting to
 typing, achievements, a boss-rush mode, buddies that meet each other, calendar import
 for reminders.

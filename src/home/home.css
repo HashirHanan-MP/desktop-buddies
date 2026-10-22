@@ -85,6 +85,12 @@ body[data-platform="darwin"] .switcher { padding-left: 84px; margin-top: -24px; 
 .char b { display: block; font-size: 12.5px; }
 .char small { display: block; color: var(--sub); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
 .char.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent2); }
+/* four or more characters: small stacked buttons (avatar over name) */
+.switcher.many { gap: 6px; }
+.switcher.many .char { flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 3px; padding: 6px 2px 5px; text-align: center; }
+.switcher.many .char b { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.switcher.many .char small { display: none; }
+.switcher.many .char span { min-width: 0; max-width: 100%; }
 body[data-character="cat"] .only-hero, body:not([data-character="cat"]) .only-cat { display: none !important; }
 .hero .dot { color: var(--sub); }
 .card.pad { padding: 12px 14px; }
@@ -145,3 +151,67 @@ body[data-theme="iron"] .btn.ghost { background: transparent; color: #8ff0ff; }
 body[data-theme="iron"] select, body[data-theme="iron"] input[type="time"], body[data-theme="iron"] #remText, body[data-theme="iron"] .rem-text { background: rgba(0, 0, 0, 0.35); border-radius: 2px; color-scheme: dark; }
 body[data-theme="iron"] .toggle:checked { background: #2fb8e0; }
 body[data-theme="iron"] .rem-quick button { border-radius: 2px; background: rgba(0, 0, 0, 0.3); }
+
+/* ------------------------------------------------------------ Homelander: Vought Tower theme */
+body[data-theme="vought"] {
+  --bg: #08122b; --card: #0f1f45; --fg: #f4f1e6; --sub: #a9b6d6; --line: rgba(212, 175, 55, 0.22);
+  --accent: #d4af37; --accent2: rgba(212, 175, 55, 0.35); --hover: rgba(212, 175, 55, 0.1); --warn: #ff6b6b;
+  background: radial-gradient(1100px 480px at 50% -140px, rgba(178, 34, 52, 0.28), transparent 60%), #08122b;
+}
+body[data-theme="vought"] .hero { background: linear-gradient(160deg, rgba(178, 34, 52, 0.3), transparent 70%); border-bottom: 3px solid transparent; border-image: repeating-linear-gradient(90deg, #b22234 0 12px, #ffffff 12px 24px) 3; }
+body[data-theme="vought"] .name { color: #e8c75a; letter-spacing: 4px; font-weight: 800; text-transform: uppercase; }
+body[data-theme="vought"] .chip { background: rgba(212, 175, 55, 0.14); color: #e8c75a; }
+body[data-theme="vought"] .tabs button { text-transform: uppercase; letter-spacing: 1px; font-size: 11.5px; }
+body[data-theme="vought"] h3 { color: #d4af37; letter-spacing: 2px; }
+body[data-theme="vought"] .stat b { color: #e8c75a; }
+body[data-theme="vought"] .btn { background: #b22234; color: #fff; border-color: #d4af37; }
+body[data-theme="vought"] .btn.warn { background: transparent; color: var(--warn); border-color: var(--warn); }
+body[data-theme="vought"] .btn.ghost { background: transparent; color: #e8c75a; }
+body[data-theme="vought"] select, body[data-theme="vought"] input[type="time"], body[data-theme="vought"] #remText, body[data-theme="vought"] .rem-text { background: rgba(0, 0, 0, 0.3); color-scheme: dark; }
+body[data-theme="vought"] .toggle:checked { background: #b22234; }
+body[data-theme="vought"] .need .bar { background: rgba(212, 175, 55, 0.12); }
+
+/* ------------------------------------------------------------ Hulk: gamma theme */
+body[data-theme="gamma"] {
+  --bg: #0b170b; --card: #132713; --fg: #eaffdf; --sub: #9cc48a; --line: rgba(124, 255, 79, 0.2);
+  --accent: #7cff4f; --accent2: rgba(124, 255, 79, 0.35); --hover: rgba(124, 255, 79, 0.1); --warn: #ff7a6b;
+  background: radial-gradient(1100px 480px at 50% -140px, rgba(123, 63, 160, 0.3), transparent 60%), #0b170b;
+}
+body[data-theme="gamma"] .hero { background: linear-gradient(160deg, rgba(79, 157, 42, 0.32), transparent 70%); }
+body[data-theme="gamma"] .name { color: #8dff5a; font: 900 26px Impact, Haettenschweiler, "Arial Black", sans-serif; letter-spacing: 2px; text-transform: uppercase; text-shadow: 3px 3px 0 #2c4a14; }
+body[data-theme="gamma"] .chip { background: rgba(123, 63, 160, 0.3); color: #d9c2ff; }
+body[data-theme="gamma"] .tabs button { text-transform: uppercase; font-weight: 800; }
+body[data-theme="gamma"] h3 { color: #8dff5a; letter-spacing: 1.5px; }
+body[data-theme="gamma"] .stat b { color: #8dff5a; font-family: Impact, Haettenschweiler, "Arial Black", sans-serif; font-weight: 400; font-size: 20px; }
+body[data-theme="gamma"] .needs, body[data-theme="gamma"] .card, body[data-theme="gamma"] .stat,
+body[data-theme="gamma"] .qa, body[data-theme="gamma"] .rem, body[data-theme="gamma"] .char { border-radius: 16px; }
+body[data-theme="gamma"] .btn { background: #4f9d2a; color: #fff; border-color: #8dff5a; font-weight: 800; }
+body[data-theme="gamma"] .btn.warn { background: transparent; color: var(--warn); border-color: var(--warn); }
+body[data-theme="gamma"] .btn.ghost { background: transparent; color: #8dff5a; }
+body[data-theme="gamma"] select, body[data-theme="gamma"] input[type="time"], body[data-theme="gamma"] #remText, body[data-theme="gamma"] .rem-text { background: rgba(0, 0, 0, 0.3); color-scheme: dark; }
+body[data-theme="gamma"] .toggle:checked { background: #4f9d2a; }
+body[data-theme="gamma"] .need .bar { background: rgba(124, 255, 79, 0.12); }
+
+/* ------------------------------------------------------------ Spider-Man: web theme */
+body[data-theme="spider"] {
+  --bg: #0f1530; --card: #1a2350; --fg: #ffffff; --sub: #b9c2ea; --line: rgba(255, 255, 255, 0.14);
+  --accent: #e23a44; --accent2: rgba(226, 58, 68, 0.4); --hover: rgba(255, 255, 255, 0.08); --warn: #ff8a8f;
+  background:
+    repeating-radial-gradient(circle at 100% 0, transparent 0 34px, rgba(255, 255, 255, 0.04) 34px 35px),
+    repeating-conic-gradient(from 180deg at 100% 0, transparent 0 6deg, rgba(255, 255, 255, 0.04) 6deg 6.5deg),
+    #0f1530;
+}
+body[data-theme="spider"] .hero { background: linear-gradient(160deg, rgba(196, 22, 31, 0.45), transparent 75%); }
+body[data-theme="spider"] .name { color: #ffffff; font: italic 900 24px "Segoe UI", system-ui, sans-serif; letter-spacing: 1px; text-transform: uppercase; text-shadow: 2px 2px 0 #c4161f, 4px 4px 0 #0e1430; }
+body[data-theme="spider"] .chip { background: rgba(226, 58, 68, 0.22); color: #ffd9dc; }
+body[data-theme="spider"] .tabs button { font-style: italic; font-weight: 800; text-transform: uppercase; }
+body[data-theme="spider"] h3 { color: #ff8a8f; }
+body[data-theme="spider"] .stat b { color: #ffffff; text-shadow: 1px 1px 0 #c4161f; }
+body[data-theme="spider"] .needs, body[data-theme="spider"] .card, body[data-theme="spider"] .stat,
+body[data-theme="spider"] .qa, body[data-theme="spider"] .rem, body[data-theme="spider"] .char { border-radius: 14px; }
+body[data-theme="spider"] .btn { background: #c4161f; color: #fff; border-color: #ffffff; }
+body[data-theme="spider"] .btn.warn { background: transparent; color: var(--warn); border-color: var(--warn); }
+body[data-theme="spider"] .btn.ghost { background: transparent; color: #ffffff; }
+body[data-theme="spider"] select, body[data-theme="spider"] input[type="time"], body[data-theme="spider"] #remText, body[data-theme="spider"] .rem-text { background: rgba(0, 0, 0, 0.3); color-scheme: dark; }
+body[data-theme="spider"] .toggle:checked { background: #c4161f; }
+body[data-theme="spider"] .need .bar { background: rgba(255, 255, 255, 0.12); }

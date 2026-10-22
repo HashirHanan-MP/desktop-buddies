@@ -1,5 +1,7 @@
-# Builds Desktop Cat for Windows, macOS and Linux on their native runners.
-# Push a tag like v1.0.0 (or run it manually) and download the installers
+# Builds every edition for Windows, macOS and Linux on their native runners:
+# the full Desktop Buddies (all characters) and one app per character —
+# Desktop Cat, Desktop Homelander, Desktop Hulk and Desktop Spider-Man.
+# Push a tag like v3.0.0 (or run it manually) and download the installers
 # from the workflow run's "Artifacts" section.
 name: build
 
@@ -9,18 +11,8 @@ on:
     tags: ['v*']
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            cmd: npx electron-builder --win --publish never
-          - os: macos-latest
-            cmd: npx electron-builder --mac --publish never
-          - os: ubuntu-latest
-            cmd: npx electron-builder --linux --publish never
-    runs-on: ${{ matrix.os }}
+  test:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,16 +20,31 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm test
-      - run: ${{ matrix.cmd }}
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        edition: [all, cat, homelander, hulk, spiderman]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: node scripts/build-editions.js ${{ matrix.edition }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-cat-${{ matrix.os }}
+          name: ${{ matrix.edition }}-${{ matrix.os }}
           path: |
-            dist/*.exe
-            dist/*.dmg
-            dist/*.zip
-            dist/*.AppImage
-            dist/*.deb
+            dist/${{ matrix.edition }}/*.exe
+            dist/${{ matrix.edition }}/*.dmg
+            dist/${{ matrix.edition }}/*.zip
+            dist/${{ matrix.edition }}/*.AppImage
+            dist/${{ matrix.edition }}/*.deb
           if-no-files-found: error

@@ -2,6 +2,10 @@
 /*
  * Desktop Cat — the world simulation (runs in the main process).
  *
+ * With `extras` (the standalone Desktop Cat app) the cat also has a bond
+ * level that unlocks outfits, a focus timer it naps through, a feather-wand
+ * toy and little gifts it brings you.
+ *
  *  - Cat: needs (food, energy, fun, clean, health, love, bladder), a brain that
  *    picks activities, and generator-based "tasks" (walk → sniff → eat → groom…).
  *  - World: everything on screen (bowls, poop, scratches, files, toys, bed…),
@@ -54,6 +58,20 @@ const FOODS = {
 
 const SPEEDS = { sneak: 22, weak: 15, walk: 40, trot: 72, run: 155, zoom: 245 };
 
+// ---- Desktop Cat extras
+// outfits, in unlock order: [key, label, level]
+const WARDROBE = [
+  ['collar', 'Collar & bell', 1], ['bowtie', 'Bow tie', 2], ['bandana', 'Bandana', 3], ['flowers', 'Flower crown', 4],
+  ['party', 'Party hat', 5], ['glasses', 'Glasses', 6], ['scarf', 'Scarf', 7], ['crown', 'Crown', 8],
+];
+const GIFT_KINDS = [
+  ['mouse', 'Toy mouse'], ['feather', 'Feather'], ['leaf', 'Leaf'], ['flower', 'Flower'], ['sock', 'Sock'],
+  ['bottlecap', 'Bottle cap'], ['ribbon', 'Ribbon'], ['button', 'Button'], ['paperball', 'Paper ball'],
+];
+const XP_NEED = (level) => 60 + 30 * (level - 1); // XP from one level to the next
+const GIFT_GAP = 15 * 60 * 1000;                  // at most one gift every 15 minutes (at normal time speed)
+const GIFT_LIFE = 20 * 60 * 1000;                 // an uncollected gift is gone after 20 minutes
+
 const LYING = new Set(['loaf', 'curl', 'lieSide', 'roll', 'catch']);
 const TALL = new Set(['sit', 'sitFront', 'standUp', 'beg', 'scratchFront', 'groom']);
 
@@ -70,12 +88,14 @@ const DEFAULT_SETTINGS = {
   bubbles: true,
   realFiles: false,
   launchAtLogin: false,
+  accessory: null, // Desktop Cat outfit (see WARDROBE)
 };
 
 const DEFAULT_COUNTERS = {
   meals: 0, treats: 0, poops: 0, poopsCleaned: 0, scratchesMade: 0, scratchesFixed: 0,
   filesTidied: 0, filesLost: 0, miceCaught: 0, laserPounces: 0, pets: 0, boops: 0,
   naps: 0, throws: 0, brushed: 0,
+  feathersCaught: 0, gifts: 0, focusSessions: 0, focusMinutes: 0,
 };
 
 function newCatData(name, palette, eyes) {
@@ -134,6 +154,12 @@ class Cat {
     }
     if (this.inBox) { this.inBox = null; this.z = 0; }
     this.caught = false;
+    if (this.carryGift) {
+      // interrupted on the way: the gift is dropped right here
+      const s = this.s;
+      this.w.add('gifts', { id: uid('g'), kind: this.carryGift, x: this.x + this.facing * 26 * s, y: this.y + 2 * s, created: now() });
+      this.carryGift = null;
+    }
   }
 
   // ------------------------------------------------------------ helpers
@@ -148,14 +174,14 @@ class Cat {
   }
 
   meow(kind) {
-    if (this.w.quiet) return;
+    if (this.w.quiet || (this.w.focus && this.sleeping)) return;
     this.lastMeowAt = now();
     this.act('meow', kind === 'long' ? 1.0 : 0.55, 'meow-' + (kind || 'short'));
   }
 
   think(icon, urgent, sec) {
     if (!this.w.settings.bubbles && !urgent) return;
-    if (this.w.quiet) return;
+    if (this.w.quiet || (this.w.focus && this.sleeping)) return;
     this.bubble = { icon, urgent: !!urgent, start: now(), until: now() + (sec || 3) * 1000 };
     this.lastBubbleAt = now();
   }
@@ -392,13 +418,14 @@ class Cat {
     const w = this.w, s = this.s;
     if (w.announcement && !this.dead) return [this.taskAnnounce(), 'announce', 96];
     if (w.quiet) return [this.taskQuiet(), 'quiet', 95];
+    if (w.focus) return [this.taskFocus(), 'focus', 94];
     if (this.health <= 0) return [this.taskDie(), 'die', 99];
     if (this.health < 30) return [this.taskWeak(), 'weak', 70];
 
     const bowl = w.bestBowl();
     if (bowl && this.food < 88) return [this.taskEat(bowl), 'eat', 55];
     const tool = w.tool && w.tool.kind;
-    if ((tool === 'mouse' || tool === 'laser') && this.energy >= 10) return [this.taskChase(), 'chase', 60];
+    if ((tool === 'mouse' || tool === 'laser' || tool === 'feather') && this.energy >= 10) return [this.taskChase(), 'chase', 60];
     if (tool === 'treat') return [this.taskTreat(), 'treat', 60];
     if (this.energy < 7) return [this.taskSleep(w.ents.bed, w.ents.bed ? 'bed' : 'floor'), 'sleep', 65];
     if (w.ents.bed && this.energy < 35) return [this.taskSleep(w.ents.bed, 'bed'), 'sleep', 55];
@@ -436,6 +463,7 @@ class Cat {
     for (const b of w.ents.boxes) add(1.4, () => this.taskBox(b), 'box');
     for (const n of w.ents.catnips) add(6, () => this.taskCatnip(n), 'catnip');
     if (w.ents.bed && this.energy < 70) add(1.2, () => this.taskSleep(w.ents.bed, 'nap'), 'bed-nap');
+    if (w.extras && this.love > 55 && this.fun > 35 && w.ents.gifts.length < 3 && now() - w.lastGiftAt > GIFT_GAP / w.timeScale) add(1.2, () => this.taskBringGift(), 'gift');
 
     let total = opts.reduce((a, o) => a + o[0], 0);
     let r = Math.random() * total;
@@ -462,7 +490,7 @@ class Cat {
   }
 
   tickNeedsBubble() {
-    if (this.mode !== 'task' || this.sleeping || this.bubble || this.w.quiet) return;
+    if (this.mode !== 'task' || this.sleeping || this.bubble || this.w.quiet || this.w.focus) return;
     const n = this.needs();
     const gap = n ? (n.urgent ? 7000 : 20000) : 60000;
     if (now() - this.lastBubbleAt < gap * rand(0.8, 1.3)) return;
@@ -479,6 +507,7 @@ class Cat {
   moodText() {
     if (this.dead) return 'resting in peace';
     if (this.w.quiet) return 'quiet time';
+    if (this.w.focus) return 'napping while you focus';
     if (this.mode === 'held') return this.expr === 'dizzy' ? 'dizzy!' : 'being carried';
     if (this.sleeping) return 'sleeping';
     if (this.health < 30) return 'very weak';
@@ -536,6 +565,7 @@ class Cat {
     this.setPose(this.energy < 40 ? 'curl' : 'loaf', 'asleep');
     this.sleeping = true;
     this.w.counters.naps++;
+    this.w.xp(2);
     yield* this.wait(dur, () => this.energy >= 99);
     this.sleeping = false;
     this.setPose('loaf', 'sleepy');
@@ -712,6 +742,7 @@ class Cat {
     }
     this.lastMealAt = now();
     w.counters.meals++;
+    w.xp(10);
     this.love = Math.min(100, this.love + info.love);
     if (bowl.amount <= 0.02) w.remove('bowls', bowl, 'poof');
     this.setPose('sit', 'happy');
@@ -775,6 +806,7 @@ class Cat {
     this.sleepInBed = !!bed;
     if (bed) bed.used = true;
     w.counters.naps++;
+    w.xp(4);
     const target = reason === 'nap' ? Math.min(100, this.energy + 35) : 99;
     yield* this.wait(60 * 60 * 4, () => this.energy >= target || (bed && w.ents.bed !== bed));
     this.sleeping = false;
@@ -927,6 +959,7 @@ class Cat {
       w.sound('swat', yarn);
       this.fun = Math.min(100, this.fun + 6);
       this.love = Math.min(100, this.love + 0.5);
+      w.xp(1);
       yield* this.wait(0.4);
     }
     this.setPose('sit', 'happy');
@@ -981,6 +1014,7 @@ class Cat {
     w.sound('sniff', this);
     yield* this.wait(1.6);
     w.remove('catnips', nip, 'sparkle');
+    w.xp(3);
     this.setPose('roll', 'derp');
     this.purring = true;
     this.fun = Math.min(100, this.fun + 20);
@@ -1018,7 +1052,7 @@ class Cat {
     let stalk = 0;
     let lastCatch = 0;
     this.think('bang', false, 1);
-    while (w.tool && (w.tool.kind === 'mouse' || w.tool.kind === 'laser')) {
+    while (w.tool && (w.tool.kind === 'mouse' || w.tool.kind === 'laser' || w.tool.kind === 'feather')) {
       const kind = w.tool.kind;
       const tgt = w.cursor;
       if (this.energy < 8) {
@@ -1029,7 +1063,47 @@ class Cat {
       }
       if (w.toyCaught) {
         // holding the mouse; wait for it to "escape"
-        if (dist(tgt, w.toyCaught) > 70 * s) { w.toyCaught = null; this.think('bang', false, 0.8); }
+        if (dist(tgt, w.toyCaught) > 70 * s) { w.toyCaught = null; this.holding = null; this.think('bang', false, 0.8); }
+        yield;
+        continue;
+      }
+      if (kind === 'feather') {
+        // the lure dangles at the cursor: get under it, wiggle, and leap straight up
+        const under = w.geo.clampWork({ x: tgt.x - this.facing * 14 * s, y: tgt.y + 88 * s }, 10 * s);
+        const d = dist(this, under);
+        this.look = { ref: 'cursor' };
+        if (d > 34 * s || w.cursorSpeed() > 900 * s) {
+          this.step(under, d > 160 * s ? 'run' : 'trot', 'hunt');
+        } else if (now() - lastCatch > 1800 && this.energy >= 10) {
+          this.faceTo(tgt);
+          this.setPose('crouch', 'hunt');
+          this.flags.wiggle = true;
+          yield* this.wait(rand(0.25, 0.6));
+          this.flags.wiggle = false;
+          if (yield* this.leapAt()) {
+            lastCatch = now();
+            w.toyCaught = { x: w.cursor.x, y: w.cursor.y };
+            this.holding = 'feather';
+            w.counters.feathersCaught++;
+            w.xp(8);
+            w.sound('flutter', this);
+            w.fx('star', this.x + this.facing * 24 * s, this.y - 56 * s, { n: 5 });
+            this.setPose('sit', 'proud');
+            this.fun = Math.min(100, this.fun + 12);
+            this.love = Math.min(100, this.love + 2);
+            this.think('heart', false, 1.8);
+            yield* this.wait(1);
+          } else {
+            this.setPose('crouch', 'hunt');
+            yield* this.wait(0.2);
+          }
+        } else {
+          this.faceTo(tgt);
+          this.setPose('sit', 'hunt');
+          if (chance(0.03)) this.act('swat', 0.35);
+        }
+        this.energy = Math.max(0, this.energy - 0.3 * this.dt);
+        this.fun = Math.min(100, this.fun + 0.9 * this.dt);
         yield;
         continue;
       }
@@ -1083,12 +1157,41 @@ class Cat {
     yield* this.wait(1.5);
   }
 
+  // a vertical leap at the dangling feather; true if it caught it at the top
+  * leapAt() {
+    const w = this.w, s = this.s;
+    const lure = w.cursor;
+    const height = clamp(this.y - lure.y - 48 * s, 24 * s, 130 * s);
+    const dur = 0.4 + height / (650 * s);
+    const x0 = this.x, x1 = this.x + clamp(lure.x - this.facing * 18 * s - this.x, -30 * s, 30 * s);
+    this.faceTo(lure);
+    this.setPose('pounce', 'wild');
+    w.sound('pounce', this);
+    let t = 0, got = false;
+    while (t < dur) {
+      t += this.dt;
+      const k = clamp(t / dur, 0, 1);
+      this.x = lerp(x0, x1, k);
+      this.z = Math.sin(Math.PI * k) * height;
+      if (k > 0.25 && k < 0.8 && !got) {
+        const head = { x: this.x + this.facing * 24 * s, y: this.y - this.z - 52 * s };
+        if (dist(head, w.cursor) < 44 * s && w.cursorSpeed() < 1100 * s) got = true;
+        if (k > 0.4 && !this.action) this.act('swat', 0.3);
+      }
+      yield;
+    }
+    this.z = 0;
+    w.fx('dust', this.x, this.y, { n: 3 });
+    return got;
+  }
+
   * afterPounce(kind, lastCatch) {
     const w = this.w, s = this.s;
     const paw = { x: this.x + this.facing * 28 * s, y: this.y };
     const got = dist(paw, w.cursor) < 34 * s;
     if (kind === 'laser') {
       w.counters.laserPounces++;
+      w.xp(1);
       this.setPose('crouch', 'curious');
       if (got) {
         // pounced on the dot... where did it go?
@@ -1102,6 +1205,7 @@ class Cat {
     if (got && w.cursorSpeed() < 900 * s && now() - lastCatch > 2500) {
       w.toyCaught = { x: w.cursor.x, y: w.cursor.y };
       w.counters.miceCaught++;
+      w.xp(10);
       w.sound('squeak', this);
       w.fx('star', paw.x, paw.y - 20 * s, { n: 5 });
       this.setPose('catch', 'proud');
@@ -1136,6 +1240,7 @@ class Cat {
           w.tool = null;
           w.dirty();
           w.counters.treats++;
+          w.xp(6);
           this.food = Math.min(100, this.food + 8);
           this.fun = Math.min(100, this.fun + 12);
           this.love = Math.min(100, this.love + 6);
@@ -1339,6 +1444,81 @@ class Cat {
     yield* this.wait(1.5);
   }
 
+  // ---- Desktop Cat extras
+  // the focus timer: nap in the corner of the main screen until it's over
+  * taskFocus() {
+    const w = this.w, s = this.s;
+    const d = w.geo.primary;
+    const spot = { x: d.work.x + d.work.width - 90 * s, y: d.work.y + d.work.height - 34 * s };
+    this.bubble = { icon: 'tomato', urgent: false, start: now(), until: now() + 2200 };
+    yield* this.walkTo(spot, { speed: 'trot', expr: 'content', timeout: 25, until: () => !w.focus });
+    if (w.focus) {
+      this.facing = -1;
+      this.setPose('loaf', 'content');
+      yield* this.wait(1.2, () => !w.focus);
+      this.setPose('curl', 'asleep');
+      this.sleeping = true;
+      while (w.focus) {
+        this.energy = Math.min(100, this.energy + RATE.energySleepFloor * this.dt * w.timeScale);
+        yield;
+      }
+      this.sleeping = false;
+    }
+    yield* this.taskStretch();
+  }
+
+  // a new outfit: show it off
+  * taskShowOff(wearing) {
+    const w = this.w, s = this.s;
+    this.faceTo(w.cursor);
+    this.setPose('sitFront', wearing ? 'proud' : 'content');
+    this.look = { ref: 'cursor' };
+    w.fx('sparkle', this.x + this.facing * 20 * s, this.y - 58 * s, { n: 8 });
+    if (wearing) { this.meow('happy'); this.think('heart', false, 2); }
+    yield* this.wait(2.4);
+  }
+
+  // level up: a happy hop or two
+  * taskCelebrate() {
+    const w = this.w, s = this.s;
+    this.faceTo(w.cursor);
+    this.meow('happy');
+    for (let i = 0; i < 2; i++) yield* this.jumpTo({ x: this.x, y: this.y }, 22 * s, 0.34);
+    this.setPose('sitFront', 'proud');
+    this.look = { ref: 'cursor' };
+    this.think('heart', false, 2);
+    yield* this.wait(2);
+  }
+
+  // find something somewhere and bring it to you
+  * taskBringGift() {
+    const w = this.w, s = this.s;
+    w.lastGiftAt = now();
+    const d = w.geo.displayAt(this) || w.geo.primary;
+    const edge = { x: chance(0.5) ? d.work.x + 55 * s : d.work.x + d.work.width - 55 * s, y: d.work.y + d.work.height * rand(0.45, 0.9) };
+    yield* this.walkTo(w.geo.clampWork(edge, 30 * s), { speed: 'trot', expr: 'curious', timeout: 25 });
+    this.setPose('eat', 'curious');
+    w.sound('sniff', this);
+    yield* this.wait(1.4);
+    const kind = pick(GIFT_KINDS)[0];
+    this.carryGift = kind;
+    w.dirty();
+    const cur = w.cursor;
+    const dest = w.geo.inWork(cur)
+      ? w.geo.clampWork({ x: cur.x + (this.x < cur.x ? -1 : 1) * 70 * s, y: cur.y + 55 * s }, 30 * s)
+      : w.geo.randomPoint(80 * s, this, 300 * s);
+    yield* this.walkTo(dest, { speed: 'trot', expr: 'proud', timeout: 25 });
+    this.faceTo(w.cursor);
+    this.carryGift = null;
+    const g = w.add('gifts', { id: uid('g'), kind, x: this.x + this.facing * 26 * s, y: this.y + 2 * s, created: now() });
+    w.sound('pop', g);
+    this.setPose('sitFront', 'proud');
+    this.look = { ref: 'cursor' };
+    this.think('gift', false, 2.6);
+    this.meow('happy');
+    yield* this.wait(3);
+  }
+
   * taskArrive() {
     const w = this.w, s = this.s;
     const d = w.geo.primary;
@@ -1378,8 +1558,9 @@ function isNight() {
 
 // ======================================================================= World
 class World {
-  constructor({ geo, data, desktopItems, emit, settings }) {
+  constructor({ geo, data, desktopItems, emit, settings, extras }) {
     this.character = 'cat';
+    this.extras = !!extras; // the standalone Desktop Cat app: levels, outfits, focus timer, feather, gifts
     this.geo = geo;
     this.emit = emit || (() => {});
     this.desktopItems = desktopItems || (() => []);
@@ -1387,7 +1568,7 @@ class World {
     this.announcement = null;
     this.counters = { ...DEFAULT_COUNTERS, ...((data && data.counters) || {}) };
     this.memorial = (data && data.memorial) || [];
-    this.ents = { bowls: [], poops: [], scratches: [], files: [], yarns: [], boxes: [], posts: [], catnips: [], bed: null, grave: null };
+    this.ents = { bowls: [], poops: [], scratches: [], files: [], yarns: [], boxes: [], posts: [], catnips: [], gifts: [], bed: null, grave: null };
     if (data && data.ents) {
       for (const k of Object.keys(this.ents)) if (data.ents[k] != null) this.ents[k] = data.ents[k];
       for (const b of this.ents.bowls) b.eating = false;
@@ -1396,6 +1577,12 @@ class World {
     }
     this.tool = null;
     this.toyCaught = null;
+    const X = (data && data.extras) || {};
+    this.progress = { xp: Number.isFinite(X.xp) ? X.xp : 0, level: Number.isFinite(X.level) ? Math.max(1, X.level) : 1 };
+    this.giftShelf = { ...(X.gifts || {}) };
+    this.lastGiftAt = Number.isFinite(X.lastGiftAt) ? X.lastGiftAt : now() - GIFT_GAP * 0.6;
+    this.focus = null; // { start, until, minutes } — a session doesn't survive a restart
+    this.bellDist = 0;
     this.quiet = !!(data && data.quiet);
     this.hidden = false;
     this.cursor = { x: 0, y: 0 };
@@ -1406,7 +1593,7 @@ class World {
     this.hoverSince = 0;
     this.ver = 1;
     this.alerts = {};
-    const catData = data && data.cat ? sanitizeCat(data.cat, this.settings.palette) : newCatData(null, this.settings.palette);
+    const catData = data && data.cat ? sanitizeCat(data.cat, this.settings.palette) : newCatData(null, this.settings.palette, this.newEyes());
     this.cat = new Cat(this, catData);
     if (!data || !data.cat) this.cat.run(this.cat.taskArrive(), 'arrive', 20);
     this.placeCatOnScreen(!data || !data.cat);
@@ -1415,6 +1602,9 @@ class World {
 
   get s() { return SIZES[this.settings.size] || 1; }
   get timeScale() { return TIME_SPEEDS[this.settings.timeSpeed] || 1; }
+
+  // Desktop Cat's tabbies have green or amber eyes; the classic white cat picks any
+  newEyes() { return this.extras ? pick(['green', 'green', 'amber']) : undefined; }
 
   dirty() { this.ver++; }
 
@@ -1434,7 +1624,7 @@ class World {
       c.x = d.work.x + d.work.width * 0.5; c.y = d.work.y + d.work.height * 0.7;
     }
     // keep entities reachable after monitor changes
-    for (const k of ['bowls', 'poops', 'files', 'yarns', 'boxes', 'posts', 'catnips']) {
+    for (const k of ['bowls', 'poops', 'files', 'yarns', 'boxes', 'posts', 'catnips', 'gifts']) {
       for (const e of this.ents[k]) { const q = this.geo.clampWork(e, 20); e.x = q.x; e.y = q.y; }
     }
     for (const e of this.ents.scratches) { const q = this.geo.clampBounds(e, 10); e.x = q.x; e.y = q.y; }
@@ -1563,6 +1753,8 @@ class World {
         if (sc.fade <= 0) { this.remove('scratches', sc); }
       }
     }
+    // a gift nobody picked up is gone after a while
+    for (const g of [...this.ents.gifts]) if (now() - g.created > GIFT_LIFE) this.remove('gifts', g, 'poof');
     // bed folds away after a full sleep
     const bed = this.ents.bed;
     if (bed && bed.fadeAt && now() > bed.fadeAt && !(this.cat.sleeping && this.cat.sleepInBed)) {
@@ -1579,12 +1771,12 @@ class World {
     this.tool = kind ? { kind, start: now(), used: now() } : null;
     this.toyCaught = null;
     const c = this.cat;
-    if (kind === 'mouse' || kind === 'laser') {
+    if (kind === 'mouse' || kind === 'laser' || kind === 'feather') {
       if (c.sleeping && c.energy < 25) { c.act('earflick', 0.4); c.think('bed', false, 2); }
       else c.interrupt(c.taskChase(), 'chase', 60);
     } else if (kind === 'treat') {
       if (!c.sleeping || c.food < 60) c.interrupt(c.taskTreat(), 'treat', 60);
-    } else if (!kind && (prev === 'mouse' || prev === 'laser' || prev === 'treat') && (c.taskName === 'chase' || c.taskName === 'treat')) {
+    } else if (!kind && (prev === 'mouse' || prev === 'laser' || prev === 'feather' || prev === 'treat') && (c.taskName === 'chase' || c.taskName === 'treat')) {
       c.run(c.taskSit(3), 'sit', 10);
     }
     this.dirty();
@@ -1600,6 +1792,7 @@ class World {
     else if ((t.kind === 'mouse' || t.kind === 'laser') && age > 240) this.setTool(null);
     else if (t.kind === 'treat' && age > 90) this.setTool(null);
     else if (t.kind === 'brush' && age > 120) this.setTool(null);
+    else if (t.kind === 'feather' && age > 240) this.setTool(null);
   }
 
   // ------------------------------------------------------------ cursor & input
@@ -1652,6 +1845,7 @@ class World {
   }
 
   poopAt(p) { return this.hitList(this.ents.poops, p, 20, 18, 11); }
+  giftAt(p) { return this.hitList(this.ents.gifts, p, 18, 16, 8); }
   fileAt(p) { return this.hitList(this.ents.files.filter((f) => !f.carried), p, 17, 24, 12); }
   yarnAt(p) { return this.hitList(this.ents.yarns, p, 14, 14, 9); }
   scratchAt(p) {
@@ -1679,6 +1873,7 @@ class World {
     const t = this.tool && this.tool.kind;
     if (t === 'scoop' && this.poopAt(p)) return true;
     if (t === 'repair' && this.scratchAt(p)) return true;
+    if (this.giftAt(p)) return true;
     if (this.hitCat(p)) return true;
     if (this.yarnAt(p) || this.fileAt(p)) return true;
     if (this.graveAt(p)) return true;
@@ -1695,7 +1890,7 @@ class World {
     if (t === 'brush' && this.hitCat(p)) return 'none';
     if (this.hitCat(p)) return t === 'treat' ? 'none' : 'grab';
     if (this.yarnAt(p)) return 'grab';
-    if (this.fileAt(p) || this.graveAt(p)) return 'pointer';
+    if (this.fileAt(p) || this.graveAt(p) || this.giftAt(p)) return 'pointer';
     return 'default';
   }
 
@@ -1715,6 +1910,8 @@ class World {
       this.press = { target: 'box', x: p.x, y: p.y, t: now() };
       return;
     }
+    const gift = this.giftAt(p);
+    if (gift) { this.collectGift(gift); return; }
     if (this.hitCat(p) && !this.cat.dead) {
       this.press = { target: 'cat', x: p.x, y: p.y, t: now(), dragging: false };
       return;
@@ -1791,6 +1988,7 @@ class World {
     if (pet.active && !wasActive) {
       this.counters.pets++;
       if (this.tool && this.tool.kind === 'brush') this.counters.brushed++;
+      if (t - (this.lastPetXp || 0) > 20000) { this.lastPetXp = t; this.xp(this.tool && this.tool.kind === 'brush' ? 3 : 2); }
       if (c.sleeping) { c.purring = true; c.expr = 'asleep'; }
       else if (c.taskName !== 'petted' && c.taskPrio < 30) c.run(c.taskPetted(), 'petted', 30);
     }
@@ -1802,6 +2000,7 @@ class World {
     if (this.tool) this.tool.used = now();
     this.remove('poops', poop);
     this.counters.poopsCleaned++;
+    this.xp(3);
     this.cat.clean = Math.min(100, this.cat.clean + 10);
     this.sound('scoop', poop);
     this.fx('sparkle', poop.x, poop.y - 12 * this.s, { n: 7 });
@@ -1816,6 +2015,7 @@ class World {
     if (this.tool) this.tool.used = now();
     sc.fixing = true;
     this.counters.scratchesFixed++;
+    this.xp(2);
     this.sound('spray', sc);
     this.fx('sparkle', sc.x, sc.y, { n: 8, color: '#bfe4ff' });
     this.dirty();
@@ -1823,6 +2023,7 @@ class World {
 
   tidyFile(f) {
     this.counters.filesTidied++;
+    this.xp(1);
     this.sound('pop', f);
     this.fx('sparkle', f.x, f.y - 14 * this.s, { n: 5 });
     this.emit({ type: 'fx', kind: 'fileAway', x: f.x, y: f.y, name: f.name, fkind: f.kind, ext: f.ext, rot: f.rot });
@@ -1854,7 +2055,7 @@ class World {
     old.resetTransient();
     for (const f of this.ents.files) f.carried = false;
     this.press = null;
-    const data = newCatData(null, this.settings.palette);
+    const data = newCatData(null, this.settings.palette, this.newEyes());
     this.cat = new Cat(this, data);
     this.alerts = {};
     this.cat.run(this.cat.taskArrive(), 'arrive', 20);
@@ -1868,6 +2069,81 @@ class World {
     g.flowers = Math.min(7, (g.flowers || 0) + 1);
     this.fx('heart', g.x, g.y - 50 * this.s, { n: 2 });
     this.dirty();
+  }
+
+  // ------------------------------------------------------------ Desktop Cat extras
+  xp(n) {
+    if (!this.extras || !(n > 0) || this.cat.dead) return;
+    const P = this.progress;
+    P.xp += n;
+    while (P.xp >= XP_NEED(P.level)) { P.xp -= XP_NEED(P.level); P.level++; this.levelUp(P.level); }
+    this.dirty();
+  }
+
+  levelUp(level) {
+    const c = this.cat, s = this.s;
+    const item = WARDROBE.find((it) => it[2] === level);
+    this.fx('confetti', c.x, c.y - c.z - 60 * s, { n: 28 });
+    this.fx('text', c.x, c.y - c.z - 92 * s, { text: `LEVEL ${level}!`, color: '#e8743b' });
+    this.sound('levelUp', c);
+    if (this.settings.notifications && !this.quiet) {
+      this.emit({ type: 'notify', title: `🎉 ${c.name} reached level ${level}!`, body: item ? `New outfit unlocked: ${item[1]}. Right-click → Dress up.` : 'Your bond keeps growing.' });
+    }
+    if (c.mode === 'task' && !c.sleeping && c.taskPrio < 40) c.run(c.taskCelebrate(), 'celebrate', 40);
+  }
+
+  unlocked(key) {
+    const it = WARDROBE.find((x) => x[0] === key);
+    return !!it && this.progress.level >= it[2];
+  }
+
+  wear(item) {
+    const c = this.cat;
+    item = item && item !== 'none' ? item : null;
+    if (item && !this.unlocked(item)) { if (c.mode === 'task' && !c.sleeping) c.think('question', false, 1.5); return false; }
+    this.settings.accessory = item;
+    if (!c.dead && c.mode === 'task' && !c.sleeping && c.taskPrio < 40) c.run(c.taskShowOff(!!item), 'showoff', 38);
+    this.dirty();
+    return true;
+  }
+
+  startFocus(minutes) {
+    const c = this.cat;
+    if (!this.extras || c.dead) return;
+    this.clearAnnouncement('__focus');
+    minutes = clamp(Math.round(Number(minutes) || 25), 1, 180);
+    this.focus = { start: now(), until: now() + minutes * 60000, minutes };
+    this.setTool(null);
+    if (c.mode === 'task') c.run(c.taskFocus(), 'focus', 94);
+    this.sound('focusStart', c);
+    this.dirty();
+  }
+
+  stopFocus(done) {
+    const f = this.focus;
+    if (!f) return;
+    this.focus = null;
+    if (done) {
+      this.counters.focusSessions++;
+      this.counters.focusMinutes += f.minutes;
+      this.xp(f.minutes);
+      this.emit({ type: 'focusDone', minutes: f.minutes, name: this.cat.name });
+    }
+    this.dirty(); // the napping cat notices and gets up by itself
+  }
+
+  collectGift(g) {
+    const s = this.s;
+    const label = (GIFT_KINDS.find((k) => k[0] === g.kind) || [g.kind, 'Gift'])[1];
+    this.remove('gifts', g);
+    this.giftShelf[g.kind] = (this.giftShelf[g.kind] || 0) + 1;
+    this.counters.gifts++;
+    this.sound('gift', g);
+    this.fx('sparkle', g.x, g.y - 12 * s, { n: 8 });
+    this.fx('text', g.x, g.y - 34 * s, { text: `${label}!`, color: '#e8743b' });
+    this.xp(5);
+    const c = this.cat;
+    if (c.mode === 'task' && !c.sleeping && !c.dead) c.think('heart', false, 1.6);
   }
 
   // Commands from the right-click menu / Cat Home window.
@@ -1912,6 +2188,10 @@ class World {
       case 'wake': if (c.sleeping && c.mode === 'task') c.run(c.taskStretch(), 'wake', 40); break;
       case 'putAwayBed': if (this.ents.bed) { this.fx('poof', this.ents.bed.x, this.ents.bed.y - 8 * s, { n: 6 }); this.ents.bed = null; this.dirty(); } break;
       case 'toyMouse': this.setTool(this.tool && this.tool.kind === 'mouse' ? null : 'mouse'); break;
+      case 'feather': if (this.extras && !c.dead && !this.focus) this.setTool(this.tool && this.tool.kind === 'feather' ? null : 'feather'); break;
+      case 'wear': if (this.extras) this.wear(a.item); break;
+      case 'focus': this.startFocus(a.minutes); break;
+      case 'focusStop': this.stopFocus(false); break;
       case 'laser': this.setTool(this.tool && this.tool.kind === 'laser' ? null : 'laser'); break;
       case 'brush': this.setTool(this.tool && this.tool.kind === 'brush' ? null : 'brush'); break;
       case 'repair': if (this.ents.scratches.length) this.setTool('repair'); break;
@@ -2022,7 +2302,7 @@ class World {
     if (c.ghost && Date.now() - c.ghost.start < 8000 && near(c.ghost, 300)) return true;
     if (this.announcement) return true;
     const E = this.ents;
-    for (const k of ['bowls', 'poops', 'scratches', 'files', 'yarns', 'boxes', 'posts', 'catnips']) for (const e of E[k]) if (near(e, 100)) return true;
+    for (const k of ['bowls', 'poops', 'scratches', 'files', 'yarns', 'boxes', 'posts', 'catnips', 'gifts']) for (const e of E[k]) if (near(e, 100)) return true;
     return !!((E.bed && near(E.bed, 100)) || (E.grave && near(E.grave, 100)));
   }
 
@@ -2049,16 +2329,22 @@ class World {
     // long gaps (sleep/hibernate) are handled gently, like time away
     if (realGap && realGap > 5) { this.applyAway(realGap); return; }
     const c = this.cat;
-    const gdt = this.quiet ? 0 : dt * this.timeScale;
+    if (this.focus && now() >= this.focus.until) this.stopFocus(true);
+    const gdt = this.quiet || this.focus ? 0 : dt * this.timeScale;
     this.updateStats(gdt);
     this.updateEntities(dt);
     this.tickPress();
     c.tick(dt);
+    // the collar's bell jingles as the cat trots about
+    if (this.extras && this.settings.accessory === 'collar' && (c.pose === 'walk' || c.pose === 'run')) {
+      if (c.dist < this.bellDist) this.bellDist = c.dist;
+      if (c.dist - this.bellDist > 70 * this.s) { this.bellDist = c.dist; if (chance(0.7)) this.sound('bell', c); }
+    }
     if (!c.dead) {
       this.tickHover(dt);
       c.tickNeedsBubble();
       this.checkAlerts();
-      if (c.mode === 'task' && !this.quiet) {
+      if (c.mode === 'task' && !this.quiet && !this.focus) {
         // urgent needs interrupt whatever the cat is doing
         if (c.health <= 0 && c.taskName !== 'die') c.run(c.taskDie(), 'die', 99);
         else if (c.health < 30 && c.taskPrio < 55 && c.taskName !== 'weak') c.run(c.taskWeak(), 'weak', 70);
@@ -2089,6 +2375,7 @@ class World {
 
   checkAlerts() {
     const c = this.cat, n = c.name;
+    if (this.focus) return; // not while you're focusing
     if (c.food < 15) this.notify('food', `🐟 ${n} is very hungry!`, 'Right-click anywhere → Feed.');
     else if (c.food > 40) this.alerts.food = false;
     if (c.health < 30) this.notify('health', `💔 ${n} is getting weak`, 'Feed them soon, or they might not make it.');
@@ -2137,7 +2424,13 @@ class World {
         stats: { food: c.food, energy: c.energy, fun: c.fun, clean: c.clean, health: c.health, love: c.love },
         caught: !!this.toyCaught && c.pose === 'catch',
         petting: c.pet.active,
+        accessory: this.extras ? this.settings.accessory : null,
+        carryGift: c.carryGift || null,
+        holding: this.toyCaught ? c.holding || null : null,
       },
+      extras: this.extras,
+      progress: this.extras ? { level: this.progress.level, xp: this.progress.xp, need: XP_NEED(this.progress.level) } : null,
+      focus: this.focus,
       ents: this.ents, // main.js strips this when unchanged (see `ver`)
       ver: this.ver,
       tool: this.tool,
@@ -2166,6 +2459,11 @@ class World {
       memorial: this.memorial,
       quiet: this.quiet,
       tool: this.tool && this.tool.kind,
+      extras: this.extras,
+      progress: this.extras ? { level: this.progress.level, xp: this.progress.xp, need: XP_NEED(this.progress.level) } : null,
+      wardrobe: this.extras ? WARDROBE.map(([k, label, level]) => ({ k, label, level, unlocked: this.progress.level >= level, on: this.settings.accessory === k })) : null,
+      gifts: this.extras ? GIFT_KINDS.map(([k, label]) => ({ k, label, n: this.giftShelf[k] || 0 })) : null,
+      focus: this.focus,
     };
   }
 
@@ -2175,8 +2473,9 @@ class World {
     for (const k of ['id', 'name', 'born', 'palette', 'eyes', 'x', 'y', 'food', 'energy', 'fun', 'clean', 'health', 'love', 'bladder', 'dead', 'died']) cat[k] = c[k];
     const ents = JSON.parse(JSON.stringify(this.ents));
     ents.scratches = ents.scratches.filter((s) => !s.fixing).map((s) => ({ ...s, progress: 1 }));
-    return { version: 1, savedAt: now(), cat, ents, settings: this.settings, counters: this.counters, memorial: this.memorial, quiet: this.quiet };
+    const extras = { xp: this.progress.xp, level: this.progress.level, gifts: this.giftShelf, lastGiftAt: this.lastGiftAt };
+    return { version: 1, savedAt: now(), cat, ents, settings: this.settings, counters: this.counters, memorial: this.memorial, quiet: this.quiet, extras };
   }
 }
 
-module.exports = { World, DEFAULT_SETTINGS, TIME_SPEEDS, SIZES };
+module.exports = { World, DEFAULT_SETTINGS, TIME_SPEEDS, SIZES, WARDROBE, GIFT_KINDS, XP_NEED };

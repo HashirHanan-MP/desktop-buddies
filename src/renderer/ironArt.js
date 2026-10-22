@@ -23,8 +23,12 @@
   const lp = (a, b, k) => ({ x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) });
 
   // ------------------------------------------------------------------ suits
+  // The three suits are classic (Mark III), mark50 (nanotech: form 'nano') and hulkbuster
+  // (form 'buster', drawn bulky and bigger); the rest are color schemes for the Iron Legion.
   const SUITS = {
-    classic: { label: 'Classic red & gold', red: ['#f0464c', '#c41f2a', '#7a0d16'], gold: ['#ffe08a', '#f2b134', '#a8700f'], line: '#2a080d', dark: '#3a1015', glow: '#d8fbff', halo: '90,220,255' },
+    classic: { label: 'Mark III — Classic', red: ['#f0464c', '#c41f2a', '#7a0d16'], gold: ['#ffe08a', '#f2b134', '#a8700f'], line: '#2a080d', dark: '#3a1015', glow: '#d8fbff', halo: '90,220,255' },
+    mark50: { label: 'Mark 50 — Nanotech', form: 'nano', red: ['#f2414a', '#b5121f', '#5e0710'], gold: ['#fff2b8', '#f5c542', '#a3720b'], line: '#22060a', dark: '#2c0a10', glow: '#ecfdff', halo: '110,232,255', seam: 'rgba(30,4,8,0.5)' },
+    hulkbuster: { label: 'Hulkbuster', form: 'buster', body: 1.4, red: ['#f04c4f', '#bf262d', '#701116'], gold: ['#ffe29a', '#ecab3c', '#9c6614'], metal: ['#dde2ea', '#959dab', '#4b525e'], line: '#240709', dark: '#262a31', glow: '#dcfbff', halo: '90,220,255' },
     stealth: { label: 'Stealth', red: ['#5b6170', '#343843', '#17191f'], gold: ['#d9dee8', '#9aa3b3', '#5f6778'], line: '#06070a', dark: '#14161b', glow: '#ffffff', halo: '170,200,255' },
     silver: { label: 'Silver prototype', red: ['#f2f4f7', '#b8bfca', '#717a88'], gold: ['#e1e5eb', '#a6aebb', '#68717f'], line: '#262a31', dark: '#3d424b', glow: '#e9fbff', halo: '120,220,255' },
     patriot: { label: 'Patriot', red: ['#4a6fd0', '#26408f', '#142355'], gold: ['#ffffff', '#d4d9e2', '#8d95a5'], line: '#0a1230', dark: '#7a1420', glow: '#ffffff', halo: '160,200,255' },
@@ -454,6 +458,13 @@
     const d = norm(sub(L.foot, L.knee)), n = P(d.y, -d.x);
     const a = add(lp(L.knee, L.foot, 0.25), mul(n, 1.8)), b = add(lp(L.knee, L.foot, 0.85), mul(n, 1.6));
     limb(ctx, a, b, 3.8, 3.1, gold, S.line);
+    if (S.form === 'nano') {
+      // Mark 50: a gold thigh plate and nano-segment seams
+      const dt = norm(sub(L.knee, L.hip)), nt = P(dt.y, -dt.x);
+      limb(ctx, add(lp(L.hip, L.knee, 0.22), mul(nt, 2.2)), add(lp(L.hip, L.knee, 0.72), mul(nt, 1.9)), 4.4, 3.4, gold, S.line);
+      seams(ctx, L.hip, L.knee, 10, [0.85], S.seam);
+      seams(ctx, L.knee, L.foot, 8, [0.12, 0.92], S.seam);
+    }
     // boot
     ctx.save();
     ctx.translate(L.foot.x, L.foot.y);
@@ -474,9 +485,12 @@
   function drawArm(ctx, A, S, far, pods) {
     const red = far ? [S.red[1], S.red[2], S.red[2]] : S.red;
     const gold = far ? [S.gold[1], S.gold[2], S.gold[2]] : S.gold;
-    limb(ctx, A.sh, A.elbow, 8.2, 7.2, gold, S.line);
-    limb(ctx, A.elbow, A.hand, 7.6, 8.4, red, S.line);
-    ctx.beginPath(); ctx.arc(A.elbow.x, A.elbow.y, 3.1, 0, TAU); ctx.fillStyle = S.dark; ctx.fill();
+    const nano = S.form === 'nano';
+    // Mark 50: red upper arm, gold forearm, segmented
+    limb(ctx, A.sh, A.elbow, 8.2, 7.2, nano ? red : gold, S.line);
+    limb(ctx, A.elbow, A.hand, 7.6, 8.4, nano ? gold : red, S.line);
+    if (nano) { seams(ctx, A.sh, A.elbow, 7.6, [0.55], S.seam); seams(ctx, A.elbow, A.hand, 8, [0.35, 0.72], S.seam); }
+    ctx.beginPath(); ctx.arc(A.elbow.x, A.elbow.y, 3.1, 0, TAU); ctx.fillStyle = nano ? S.gold[2] : S.dark; ctx.fill();
     // hand
     ctx.save();
     ctx.translate(A.hand.x, A.hand.y);
@@ -508,7 +522,23 @@
     ctx.beginPath(); ctx.ellipse(0, -0.5, 6.6, 5.6, 0, 0, TAU);
     ctx.fillStyle = grad(ctx, 0, -6, 0, 5, red); ctx.fill();
     ctx.lineWidth = 1.1; ctx.strokeStyle = S.line; ctx.stroke();
+    if (nano) { ctx.beginPath(); ctx.ellipse(0, -0.5, 4.4, 3.6, 0, PI * 1.05, PI * 1.95); ctx.strokeStyle = S.gold[1]; ctx.lineWidth = 1.2; ctx.stroke(); }
     ctx.restore();
+  }
+
+  // thin lines across a limb at fractions ks of a→b (nanotech panel seams)
+  function seams(ctx, a, b, w, ks, color) {
+    const d = norm(sub(b, a)), n = P(-d.y, d.x);
+    ctx.strokeStyle = color; ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    for (const k of ks) { const c = lp(a, b, k); ctx.moveTo(c.x + n.x * w / 2, c.y + n.y * w / 2); ctx.lineTo(c.x - n.x * w / 2, c.y - n.y * w / 2); }
+    ctx.stroke();
+  }
+
+  function hexPath(ctx, x, y, r, a0) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = (a0 || 0) + i * TAU / 6; if (i) ctx.lineTo(x + cos(a) * r, y + sin(a) * r); else ctx.moveTo(x + cos(a) * r, y + sin(a) * r); }
+    ctx.closePath();
   }
 
   function drawTorso(ctx, R, S, T) {
@@ -530,32 +560,61 @@
     ctx.lineTo(8.4, -4); ctx.closePath();
     ctx.fillStyle = grad(ctx, -11, -31, 11, -4, S.red); ctx.fill();
     ctx.lineWidth = 1.2; ctx.strokeStyle = S.line; ctx.stroke();
-    // gold abs
-    ctx.beginPath();
-    ctx.moveTo(-5 + f * 0.3, -5); ctx.lineTo(5.5 + f * 0.3, -5); ctx.lineTo(6.8 + f * 0.3, -15); ctx.lineTo(-5.8 + f * 0.3, -15); ctx.closePath();
-    ctx.fillStyle = grad(ctx, 0, -15, 0, -5, S.gold); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(f * 0.3 + 0.3, -5); ctx.lineTo(f * 0.3 + 0.6, -15);
-    ctx.moveTo(-5.4 + f * 0.3, -8.4); ctx.lineTo(6 + f * 0.3, -8.4);
-    ctx.moveTo(-5.6 + f * 0.3, -11.8); ctx.lineTo(6.4 + f * 0.3, -11.8);
-    ctx.stroke();
-    // chest plate seams
-    ctx.strokeStyle = S.line; ctx.lineWidth = 0.9;
-    ctx.beginPath();
-    ctx.moveTo(-9, -16.5); ctx.quadraticCurveTo(f, -15, 10.5, -16.5);
-    ctx.moveTo(-6.5, -29); ctx.lineTo(-2 + f, -22); ctx.moveTo(8, -29); ctx.lineTo(4 + f, -22);
-    ctx.stroke();
-    // arc reactor
     const rx = 1 + f, ry = -21.5;
-    ctx.beginPath(); ctx.arc(rx, ry, 4.4, 0, TAU); ctx.fillStyle = S.dark; ctx.fill();
-    ctx.lineWidth = 1; ctx.strokeStyle = S.line; ctx.stroke();
-    ctx.beginPath(); ctx.arc(rx, ry, 3.3, 0, TAU); ctx.fillStyle = `rgba(${S.halo},${0.5 + 0.5 * R.reactor})`; ctx.fill();
-    ctx.beginPath(); ctx.arc(rx, ry, 1.8, 0, TAU); ctx.fillStyle = S.glow; ctx.globalAlpha = 0.4 + 0.6 * R.reactor; ctx.fill(); ctx.globalAlpha = 1;
-    ctx.strokeStyle = `rgba(255,255,255,${0.35 * R.reactor})`; ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) { const a = i * TAU / 10; ctx.moveTo(rx + cos(a) * 2.2, ry + sin(a) * 2.2); ctx.lineTo(rx + cos(a) * 3.2, ry + sin(a) * 3.2); }
-    ctx.stroke();
+    if (S.form === 'nano') {
+      // Mark 50: gold pectoral plates around the reactor, hexagonal ab cells, a hexagonal reactor
+      ctx.beginPath();
+      ctx.moveTo(rx - 9, -28.5); ctx.lineTo(rx - 3.5, -28); ctx.lineTo(rx - 5.6, -21.5); ctx.lineTo(rx - 10.6, -19.6); ctx.closePath();
+      ctx.moveTo(rx + 9.6, -28.5); ctx.lineTo(rx + 3.8, -28); ctx.lineTo(rx + 5.8, -21.5); ctx.lineTo(rx + 11.2, -19.6); ctx.closePath();
+      ctx.fillStyle = grad(ctx, 0, -29, 0, -19, S.gold); ctx.fill();
+      ctx.lineWidth = 0.9; ctx.strokeStyle = S.line; ctx.stroke();
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 2; c++) {
+          const hx = f * 0.3 - 2.2 + c * 4.8 + (r % 2) * 0.4, hy = -6.6 - r * 3.6;
+          hexPath(ctx, hx, hy, 2.25, PI / 6);
+          ctx.fillStyle = grad(ctx, hx, hy - 2, hx, hy + 2, S.gold); ctx.fill();
+          ctx.lineWidth = 0.7; ctx.strokeStyle = S.line; ctx.stroke();
+        }
+      }
+      ctx.strokeStyle = S.seam; ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(-10.6, -12); ctx.lineTo(-7.8, -4.6); ctx.moveTo(11.6, -12); ctx.lineTo(8.6, -4.6);
+      ctx.moveTo(-12.2, -24); ctx.lineTo(-9.4, -17.6); ctx.moveTo(13.4, -24); ctx.lineTo(11.2, -17.6);
+      ctx.stroke();
+      ctx.strokeStyle = S.line; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(-9, -16.5); ctx.quadraticCurveTo(f, -15.4, 10.5, -16.5); ctx.stroke();
+      hexPath(ctx, rx, ry, 4.8, 0); ctx.fillStyle = S.dark; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = S.gold[2]; ctx.stroke();
+      hexPath(ctx, rx, ry, 3.5, 0); ctx.fillStyle = `rgba(${S.halo},${0.5 + 0.5 * R.reactor})`; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(rx, ry - 2.3); ctx.lineTo(rx + 2, ry + 1.2); ctx.lineTo(rx - 2, ry + 1.2); ctx.closePath();
+      ctx.fillStyle = S.glow; ctx.globalAlpha = 0.45 + 0.55 * R.reactor; ctx.fill(); ctx.globalAlpha = 1;
+    } else {
+      // gold abs
+      ctx.beginPath();
+      ctx.moveTo(-5 + f * 0.3, -5); ctx.lineTo(5.5 + f * 0.3, -5); ctx.lineTo(6.8 + f * 0.3, -15); ctx.lineTo(-5.8 + f * 0.3, -15); ctx.closePath();
+      ctx.fillStyle = grad(ctx, 0, -15, 0, -5, S.gold); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(f * 0.3 + 0.3, -5); ctx.lineTo(f * 0.3 + 0.6, -15);
+      ctx.moveTo(-5.4 + f * 0.3, -8.4); ctx.lineTo(6 + f * 0.3, -8.4);
+      ctx.moveTo(-5.6 + f * 0.3, -11.8); ctx.lineTo(6.4 + f * 0.3, -11.8);
+      ctx.stroke();
+      // chest plate seams
+      ctx.strokeStyle = S.line; ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(-9, -16.5); ctx.quadraticCurveTo(f, -15, 10.5, -16.5);
+      ctx.moveTo(-6.5, -29); ctx.lineTo(-2 + f, -22); ctx.moveTo(8, -29); ctx.lineTo(4 + f, -22);
+      ctx.stroke();
+      // arc reactor
+      ctx.beginPath(); ctx.arc(rx, ry, 4.4, 0, TAU); ctx.fillStyle = S.dark; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = S.line; ctx.stroke();
+      ctx.beginPath(); ctx.arc(rx, ry, 3.3, 0, TAU); ctx.fillStyle = `rgba(${S.halo},${0.5 + 0.5 * R.reactor})`; ctx.fill();
+      ctx.beginPath(); ctx.arc(rx, ry, 1.8, 0, TAU); ctx.fillStyle = S.glow; ctx.globalAlpha = 0.4 + 0.6 * R.reactor; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = `rgba(255,255,255,${0.35 * R.reactor})`; ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const a = i * TAU / 10; ctx.moveTo(rx + cos(a) * 2.2, ry + sin(a) * 2.2); ctx.lineTo(rx + cos(a) * 3.2, ry + sin(a) * 3.2); }
+      ctx.stroke();
+    }
     // back flaps (flight)
     if (R.flaps > 0.05) {
       ctx.fillStyle = S.red[2];
@@ -585,13 +644,28 @@
     ctx.beginPath(); ctx.arc(-4.6 + f * 0.2, 0.5, 2.3, 0, TAU); ctx.fillStyle = S.red[2]; ctx.fill(); ctx.lineWidth = 0.9; ctx.stroke();
     // gold faceplate
     ctx.beginPath();
-    ctx.moveTo(f - 0.2, -7.6);
-    ctx.lineTo(f + 1.4, -5.6); ctx.lineTo(f + 5.6, -5.2);
-    ctx.lineTo(f + 6.3, 2); ctx.lineTo(f + 4.6, 7.2); ctx.lineTo(f + 1.5, 8.8);
-    ctx.lineTo(f - 2.2, 8.6); ctx.lineTo(f - 3.8, 6.6); ctx.lineTo(f - 4.4, 1.6);
-    ctx.lineTo(f - 3.6, -5); ctx.lineTo(f - 1.6, -5.6); ctx.closePath();
+    if (S.form === 'nano') {
+      // Mark 50: a taller, more angular faceplate with a gold crest over the helmet
+      ctx.moveTo(f - 0.6, -10.1);
+      ctx.lineTo(f + 1.3, -6.4); ctx.lineTo(f + 6, -5.6);
+      ctx.lineTo(f + 6.6, 1.6); ctx.lineTo(f + 4.4, 7.6); ctx.lineTo(f + 1.2, 9.2);
+      ctx.lineTo(f - 2.6, 8.8); ctx.lineTo(f - 4.2, 6.4); ctx.lineTo(f - 4.8, 1.2);
+      ctx.lineTo(f - 4, -5.4); ctx.lineTo(f - 2.2, -6.4); ctx.closePath();
+    } else {
+      ctx.moveTo(f - 0.2, -7.6);
+      ctx.lineTo(f + 1.4, -5.6); ctx.lineTo(f + 5.6, -5.2);
+      ctx.lineTo(f + 6.3, 2); ctx.lineTo(f + 4.6, 7.2); ctx.lineTo(f + 1.5, 8.8);
+      ctx.lineTo(f - 2.2, 8.6); ctx.lineTo(f - 3.8, 6.6); ctx.lineTo(f - 4.4, 1.6);
+      ctx.lineTo(f - 3.6, -5); ctx.lineTo(f - 1.6, -5.6); ctx.closePath();
+    }
     ctx.fillStyle = grad(ctx, f, -7.6, f, 8.8, S.gold); ctx.fill();
     ctx.lineWidth = 1; ctx.strokeStyle = S.line; ctx.stroke();
+    if (S.form === 'nano') {
+      ctx.beginPath(); ctx.moveTo(f - 0.6, -10.1); ctx.quadraticCurveTo(f - 4.6, -10.6, -6.6, -4.4);
+      ctx.strokeStyle = S.gold[1]; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle = S.seam; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(f - 4.8, 1.2); ctx.lineTo(-6.8, 4.2); ctx.moveTo(-1.8, -9.2); ctx.lineTo(-6.2, -1.4); ctx.stroke();
+    }
     // eyes
     const e = R.eyes;
     const eye = (x1, x2, slope) => {
@@ -622,40 +696,227 @@
     ctx.restore();
   }
 
+  // ------------------------------------------------------------------ the Hulkbuster
+  // Same skeleton, drawn huge: barrel chest, broad pauldrons, piston upper arms, massive
+  // forearms and fists, block boots, and a small helmet sunk between the shoulders.
+  function drawBusterLeg(ctx, L, S, far) {
+    const red = far ? [S.red[1], S.red[2], S.red[2]] : S.red;
+    const gold = far ? [S.gold[1], S.gold[2], S.gold[2]] : S.gold;
+    const M = far ? [S.metal[1], S.metal[2], S.metal[2]] : S.metal;
+    limb(ctx, L.hip, L.knee, 16.5, 13.5, red, S.line);
+    limb(ctx, L.knee, L.foot, 13.5, 12.5, red, S.line);
+    const d = norm(sub(L.foot, L.knee)), n = P(d.y, -d.x);
+    limb(ctx, add(lp(L.knee, L.foot, 0.2), mul(n, 3.2)), add(lp(L.knee, L.foot, 0.78), mul(n, 2.8)), 5.6, 4.6, gold, S.line);
+    seams(ctx, L.hip, L.knee, 15, [0.5], 'rgba(0,0,0,0.3)');
+    // block boot
+    ctx.save();
+    ctx.translate(L.foot.x, L.foot.y);
+    ctx.rotate(L.ang);
+    ctx.beginPath();
+    ctx.moveTo(-6.6, -4.4); ctx.lineTo(5, -4.8); ctx.quadraticCurveTo(11.8, -2.6, 12.4, 4.4);
+    ctx.lineTo(-7, 5.4); ctx.closePath();
+    ctx.fillStyle = grad(ctx, 0, -4.8, 0, 5.4, red); ctx.fill();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = S.line; ctx.stroke();
+    ctx.fillStyle = S.dark; ctx.fillRect(-7, 3.6, 19.4, 2.2);
+    ctx.fillStyle = grad(ctx, 0, -4, 0, 2, gold); ctx.fillRect(5.5, -2.6, 4.2, 3.4);
+    ctx.restore();
+    // knee guard: a gold-rimmed red plate over a metal joint
+    ctx.beginPath(); ctx.ellipse(L.knee.x + 1.6, L.knee.y, 4.6, 5.4, 0, 0, TAU);
+    ctx.fillStyle = grad(ctx, L.knee.x, L.knee.y - 5, L.knee.x, L.knee.y + 5, gold); ctx.fill();
+    ctx.lineWidth = 1.1; ctx.strokeStyle = S.line; ctx.stroke();
+    ctx.beginPath(); ctx.arc(L.knee.x - 2.6, L.knee.y + 0.4, 2.2, 0, TAU);
+    ctx.fillStyle = grad(ctx, L.knee.x, L.knee.y - 2, L.knee.x, L.knee.y + 2, M); ctx.fill(); ctx.lineWidth = 0.8; ctx.stroke();
+  }
+
+  function drawBusterArm(ctx, A, S, far, pods, R, out) {
+    const red = far ? [S.red[1], S.red[2], S.red[2]] : S.red;
+    const gold = far ? [S.gold[1], S.gold[2], S.gold[2]] : S.gold;
+    const M = far ? [S.metal[1], S.metal[2], S.metal[2]] : S.metal;
+    const sh = add(A.sh, rot(P(out * (out < 0 ? 6.4 : 4.6), -1.2), R.lean)); // broader shoulders
+    // piston upper arm
+    limb(ctx, sh, A.elbow, 10.5, 9.5, M, S.line);
+    seams(ctx, sh, A.elbow, 10, [0.35, 0.65], 'rgba(0,0,0,0.35)');
+    // massive forearm with a gold stripe
+    limb(ctx, A.elbow, A.hand, 15, 17.5, red, S.line);
+    const d = norm(sub(A.hand, A.elbow)), n = P(-d.y, d.x);
+    limb(ctx, add(lp(A.elbow, A.hand, 0.18), mul(n, 4.2)), add(lp(A.elbow, A.hand, 0.72), mul(n, 4.8)), 3.4, 3.4, gold, S.line);
+    ctx.beginPath(); ctx.arc(A.elbow.x, A.elbow.y, 4.8, 0, TAU);
+    ctx.fillStyle = grad(ctx, A.elbow.x, A.elbow.y - 5, A.elbow.x, A.elbow.y + 5, M); ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = S.line; ctx.stroke();
+    // a fist the size of a car
+    ctx.save();
+    ctx.translate(A.hand.x, A.hand.y);
+    ctx.rotate(A.ang);
+    ctx.beginPath();
+    if (A.open > 0.5) { ctx.moveTo(-1, -6.4); ctx.lineTo(9, -5.8); ctx.quadraticCurveTo(12.4, 0, 9, 5.8); ctx.lineTo(-1, 6.4); }
+    else { ctx.moveTo(-1, -6.6); ctx.lineTo(6.4, -6.6); ctx.quadraticCurveTo(10.6, -6.4, 10.6, 0); ctx.quadraticCurveTo(10.6, 6.6, 6.4, 6.6); ctx.lineTo(-1, 6.6); }
+    ctx.closePath();
+    ctx.fillStyle = grad(ctx, 0, -6.6, 0, 6.6, red); ctx.fill();
+    ctx.lineWidth = 1.1; ctx.strokeStyle = S.line; ctx.stroke();
+    if (A.open <= 0.5) {
+      ctx.fillStyle = grad(ctx, 0, -6, 0, 6, M);
+      ctx.fillRect(6.4, -5.4, 3.2, 10.8);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.6;
+      ctx.beginPath(); for (const y of [-2.7, 0, 2.7]) { ctx.moveTo(6.4, y); ctx.lineTo(9.6, y); } ctx.stroke();
+    }
+    if (A.thumb > 0.1) {
+      ctx.beginPath(); ctx.moveTo(3, -6); ctx.lineTo(3 + 0.6 * A.thumb, -6 - 7 * A.thumb);
+      ctx.lineCap = 'round'; ctx.lineWidth = 4.6; ctx.strokeStyle = S.line; ctx.stroke();
+      ctx.lineWidth = 3; ctx.strokeStyle = S.red[0]; ctx.stroke();
+    }
+    ctx.restore();
+    // huge pauldron (+ missile pod)
+    ctx.save();
+    ctx.translate(sh.x, sh.y);
+    if (pods > 0.02) {
+      ctx.save();
+      ctx.rotate(-pods * 0.9);
+      ctx.fillStyle = S.dark;
+      ctx.fillRect(-6, -10 - pods * 3, 12, 7);
+      ctx.fillStyle = '#dfe6ee';
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(-4.2 + i * 2.8, -10 - pods * 3.4, 1.1, 0, TAU); ctx.fill(); }
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.ellipse(0, -1, 10.6, 8.8, -0.15 * out, 0, TAU);
+    ctx.fillStyle = grad(ctx, 0, -10, 0, 8, red); ctx.fill();
+    ctx.lineWidth = 1.3; ctx.strokeStyle = S.line; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -1, 7.6, 6, -0.15 * out, PI * 1.08, PI * 1.92);
+    ctx.strokeStyle = S.gold[1]; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBusterTorso(ctx, R, S, T) {
+    ctx.save();
+    ctx.translate(R.hip.x, R.hip.y);
+    ctx.rotate(R.lean);
+    const f = 2.2 * (R.turn - 0.35) / 0.65 + 1.2;
+    const M = S.metal;
+    // pelvis block
+    ctx.beginPath();
+    ctx.moveTo(-13, -4); ctx.lineTo(13, -4); ctx.lineTo(11.6, 6.4); ctx.lineTo(-11.6, 6.4); ctx.closePath();
+    ctx.fillStyle = grad(ctx, 0, -4, 0, 6.4, M); ctx.fill();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = S.line; ctx.stroke();
+    // back vents
+    ctx.fillStyle = S.dark;
+    ctx.fillRect(-21.4, -31, 4.4, 9); ctx.fillRect(-20.6, -20, 3.6, 6);
+    // barrel chest
+    ctx.beginPath();
+    ctx.moveTo(-11, -3);
+    ctx.lineTo(-17.4, -18); ctx.quadraticCurveTo(-20.4, -31.5, -12.4, -36);
+    ctx.lineTo(-4, -37.6); ctx.lineTo(6.4, -37.6); ctx.lineTo(14.6, -36);
+    ctx.quadraticCurveTo(22.4, -31.5, 19.6, -18);
+    ctx.lineTo(12.4, -3); ctx.closePath();
+    ctx.fillStyle = grad(ctx, -16, -37, 16, -3, S.red); ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = S.line; ctx.stroke();
+    // gold abdominal plates
+    for (let r = 0; r < 3; r++) {
+      for (const [x0, x1] of [[-7.6, -0.5], [0.5, 8.2]]) {
+        const y = -5.6 - r * 4.4;
+        ctx.beginPath(); ctx.rect(x0 + f * 0.3, y - 3.7, x1 - x0, 3.7);
+        ctx.fillStyle = grad(ctx, 0, y - 3.7, 0, y, S.gold); ctx.fill();
+        ctx.lineWidth = 0.8; ctx.strokeStyle = S.line; ctx.stroke();
+      }
+    }
+    // chest plates
+    ctx.strokeStyle = S.line; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-14, -18.6); ctx.quadraticCurveTo(f, -16.6, 16, -18.6);
+    ctx.moveTo(-10, -34.6); ctx.lineTo(-3 + f, -26); ctx.moveTo(11.6, -34.6); ctx.lineTo(5 + f, -26);
+    ctx.stroke();
+    // neck collar the helmet sits in
+    ctx.beginPath(); ctx.ellipse(1 + f * 0.4, -36.6, 8.6, 3.4, 0, 0, TAU);
+    ctx.fillStyle = grad(ctx, 0, -40, 0, -33, M); ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = S.line; ctx.stroke();
+    // big reactor (same spot as the classic suit's, so beams start there)
+    const rx = 1 + f, ry = -21.5;
+    ctx.beginPath(); ctx.arc(rx, ry, 6.4, 0, TAU); ctx.fillStyle = S.dark; ctx.fill();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = S.line; ctx.stroke();
+    ctx.beginPath(); ctx.arc(rx, ry, 4.9, 0, TAU); ctx.fillStyle = `rgba(${S.halo},${0.5 + 0.5 * R.reactor})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(rx, ry, 2.7, 0, TAU); ctx.fillStyle = S.glow; ctx.globalAlpha = 0.4 + 0.6 * R.reactor; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = `rgba(255,255,255,${0.35 * R.reactor})`; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ctx.moveTo(rx + cos(a) * 3.2, ry + sin(a) * 3.2); ctx.lineTo(rx + cos(a) * 4.7, ry + sin(a) * 4.7); }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBuster(ctx, R, S, T) {
+    drawBusterLeg(ctx, R.legs[1], S, true);
+    drawBusterArm(ctx, R.arms[1], S, true, R.pods, R, 1);
+    drawBusterTorso(ctx, R, S, T);
+    drawBusterLeg(ctx, R.legs[0], S, false);
+    // the helmet sits low between the huge shoulders
+    const hp = add(lp(R.head, R.neck, 0.3), rot(P(1.5, 0), R.lean));
+    ctx.save();
+    ctx.translate(hp.x, hp.y); ctx.scale(1.02, 1.02); ctx.translate(-hp.x, -hp.y);
+    drawHead(ctx, Object.assign({}, R, { head: hp }), S, T);
+    ctx.restore();
+    drawBusterArm(ctx, R.arms[0], S, false, R.pods, R, -1);
+  }
+
+  // Mark 50 nanotech flourishes: a blade grows out of the fist for a punch, a shield when bracing
+  function drawNanoTools(ctx, R, S, pose) {
+    if (pose === 'punch') {
+      const A = R.arms[0];
+      ctx.save();
+      ctx.translate(A.hand.x, A.hand.y); ctx.rotate(A.ang);
+      ctx.beginPath(); ctx.moveTo(4, -2.4); ctx.lineTo(19, -0.3); ctx.lineTo(4, 2.4); ctx.closePath();
+      ctx.fillStyle = grad(ctx, 4, -2, 4, 2, S.gold); ctx.fill();
+      ctx.lineWidth = 0.8; ctx.strokeStyle = S.line; ctx.stroke();
+      ctx.restore();
+    } else if (pose === 'brace') {
+      const c = lp(R.arms[0].hand, R.arms[1].hand, 0.5);
+      const x = c.x + 5, y = c.y + 3;
+      ctx.save();
+      hexPath(ctx, x, y, 14, PI / 6);
+      ctx.fillStyle = 'rgba(245,197,66,0.32)'; ctx.fill();
+      ctx.lineWidth = 1.6; ctx.strokeStyle = S.gold[1]; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,240,180,0.5)'; ctx.lineWidth = 0.6;
+      for (const [dx, dy] of [[0, 0], [-6, -3.5], [6, -3.5], [-6, 3.5], [6, 3.5]]) { hexPath(ctx, x + dx, y + dy, 3.4, PI / 6); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+
   // Draw the hero. Returns useful world-local points (reactor, palms, feet).
   function drawHero(ctx, R, opts) {
     opts = opts || {};
     const S = SUITS[opts.suit] || SUITS.classic;
     const T = opts.T || 0;
+    const buster = S.form === 'buster';
     ctx.save();
     ctx.translate(R.ox, R.oy);
     if (R.rot) { ctx.translate(R.hip.x, R.hip.y); ctx.rotate(R.rot); ctx.translate(-R.hip.x, -R.hip.y); }
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    drawLeg(ctx, R.legs[1], S, true);
-    drawArm(ctx, R.arms[1], S, true, R.pods);
-    drawTorso(ctx, R, S, T);
-    drawLeg(ctx, R.legs[0], S, false);
-    drawHead(ctx, R, S, T);
-    drawArm(ctx, R.arms[0], S, false, R.pods);
+    if (buster) drawBuster(ctx, R, S, T);
+    else {
+      drawLeg(ctx, R.legs[1], S, true);
+      drawArm(ctx, R.arms[1], S, true, R.pods);
+      drawTorso(ctx, R, S, T);
+      drawLeg(ctx, R.legs[0], S, false);
+      drawHead(ctx, R, S, T);
+      drawArm(ctx, R.arms[0], S, false, R.pods);
+      if (S.form === 'nano' && opts.h) drawNanoTools(ctx, R, S, opts.h.mode === 'ground' || opts.h.mode === 'air' ? opts.h.pose : null);
+    }
 
     // light: boot jets, palm repulsors, reactor glow
+    const big = buster ? 1.45 : 1, palmAt = buster ? 9 : 4.5;
     ctx.globalCompositeOperation = 'lighter';
     for (const L of R.legs) {
       if (R.thrustFeet > 0.02) {
         const ang = atan2(L.foot.y - L.knee.y, L.foot.x - L.knee.x); // jets fire down the leg
-        const fx = L.foot.x + cos(L.ang) * 2 - sin(L.ang) * -3.5, fy = L.foot.y + sin(L.ang) * 2 + cos(L.ang) * 3.5;
-        glow(ctx, fx, fy, 6 + 4 * R.thrustFeet, S.halo, R.thrustFeet);
-        flame(ctx, fx, fy, ang, 8 + 18 * R.thrustFeet, 4.5, S.halo, T);
+        const fx = L.foot.x + cos(L.ang) * 2 - sin(L.ang) * -3.5 * big, fy = L.foot.y + sin(L.ang) * 2 + cos(L.ang) * 3.5 * big;
+        glow(ctx, fx, fy, (6 + 4 * R.thrustFeet) * big, S.halo, R.thrustFeet);
+        flame(ctx, fx, fy, ang, (8 + 18 * R.thrustFeet) * big, 4.5 * big, S.halo, T);
       }
     }
     for (const A of R.arms) {
-      const px = A.hand.x + cos(A.ang) * 4.5, py = A.hand.y + sin(A.ang) * 4.5;
+      const px = A.hand.x + cos(A.ang) * palmAt, py = A.hand.y + sin(A.ang) * palmAt;
       const pa = max(A.palm, A.thrust);
-      if (pa > 0.02) glow(ctx, px, py, 5 + 5 * pa, S.halo, pa);
-      if (A.thrust > 0.02) flame(ctx, px, py, A.ang, 6 + 14 * A.thrust, 3.6, S.halo, T);
+      if (pa > 0.02) glow(ctx, px, py, (5 + 5 * pa) * big, S.halo, pa);
+      if (A.thrust > 0.02) flame(ctx, px, py, A.ang, (6 + 14 * A.thrust) * big, 3.6 * big, S.halo, T);
     }
     const rc = add(R.hip, rot(P(1 + 1.5 + 2.2 * (R.turn - 0.35) / 0.65 - 0.3, -21.5), R.lean));
-    glow(ctx, rc.x, rc.y, 7 + 6 * R.reactor + 10 * R.beam, S.halo, 0.45 + 0.4 * R.reactor);
+    glow(ctx, rc.x, rc.y, (7 + 6 * R.reactor + 10 * R.beam) * big, S.halo, 0.45 + 0.4 * R.reactor);
     ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
   }
@@ -1255,16 +1516,59 @@
     rig: { base, resolve, ik, reachTo, limbPath, limb, grad, flame, lerpAng, THIGH, SHIN, UPPER, FORE },
   };
 
+  // the short name of each suit on the HUD
+  const SUIT_TAG = { classic: 'MK-III', mark50: 'MK-L', hulkbuster: 'HULKBUSTER' };
+
+  // menu avatar: the bust in a 46×46 circle (the Hulkbuster's helmet sits lower)
+  function drawAvatar(ctx, suit, T) {
+    const buster = SUITS[suit] && SUITS[suit].form === 'buster';
+    ctx.translate(21, buster ? 102 : 108);
+    ctx.scale(0.95, 0.95);
+    drawBust(ctx, suit, T);
+  }
+
+  // Desktop Iron Man app icon: the three suits on a HUD-blue tile
+  function drawIcon(ctx, size) {
+    const k = size / 1024;
+    ctx.save();
+    ctx.scale(k, k);
+    const r = 220;
+    ctx.beginPath(); ctx.moveTo(r, 40); ctx.arcTo(984, 40, 984, 984, r); ctx.arcTo(984, 984, 40, 984, r); ctx.arcTo(40, 984, 40, 40, r); ctx.arcTo(40, 40, 984, 40, r); ctx.closePath();
+    const bg = ctx.createLinearGradient(0, 40, 0, 984);
+    bg.addColorStop(0, '#123a5c'); bg.addColorStop(1, '#060d18');
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.save();
+    ctx.clip();
+    const g = ctx.createRadialGradient(512, 560, 40, 512, 560, 560);
+    g.addColorStop(0, 'rgba(90,220,255,0.5)'); g.addColorStop(1, 'rgba(90,220,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1024, 1024);
+    ctx.strokeStyle = 'rgba(110,225,255,0.12)'; ctx.lineWidth = 3;
+    for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.arc(512, 560, i * 120, 0, TAU); ctx.stroke(); }
+    const bust = (suit, x, y, s, flip) => {
+      ctx.save();
+      ctx.translate(x, y); ctx.scale(flip ? -s : s, s);
+      const R = makeRig('stand', { t: 0, T: 0.4, phase: 0, m: {} });
+      R.turn = 0.62;
+      drawHero(ctx, R, { suit, T: 0.4 });
+      ctx.restore();
+    };
+    bust('hulkbuster', 520, 1250, 11, false);
+    bust('classic', 250, 1290, 8.2, false);
+    bust('mark50', 790, 1290, 8.2, true);
+    ctx.restore();
+    ctx.restore();
+  }
+
   // the armored hero as one of the heroes (see ironScene.js for what a hero art provides)
   root.HeroArts = root.HeroArts || {};
   root.HeroArts.ironman = {
     name: 'IRON MAN', theme: 'iron', looks: SUITS, lookKey: 'suit',
-    makeRig, lerpRig, drawHero, points, drawBust,
-    cardTitle: (h) => (h.ally ? h.callsign : 'MK-XLII'),
+    makeRig, lerpRig, drawHero, points, drawBust, drawAvatar, drawIcon,
+    cardTitle: (h) => (h.ally ? h.callsign : SUIT_TAG[h.suit] || 'MK-III'),
     loop: 'thrust',
     allyLabel: 'IRON LEGION',
     brief: { done: 'ACKNOWLEDGED', snooze: (m) => `SNOOZE ${m}`, time: (a) => `T-MINUS 0 · ${a.time}`, sound: 'alert' },
     voice: { prefer: /daniel|alex|aaron|arthur|david|guy|george|male|fred/i, pitch: 0.85, rate: 1.02 },
-    menuName: (s) => `MK-XLII · ${s.hero.status}`,
+    menuName: (s) => `${SUIT_TAG[s.suit] || 'MK-III'} · ${s.hero.status}`,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

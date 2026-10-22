@@ -63,6 +63,35 @@ icon and save, so you can install any of them (or several side by side):
 | **More** | Patrols, fly-bys, area scans, **diagnostics** (your real CPU, memory, battery, uptime in a HUD card), thumbs-up, eight suit colors, random invasions (off by default), difficulty, stand-by mode. Drag him and let go — his thrusters catch him. |
 | **HUD look** | His menu and the home window ("HQ") switch to a holographic HUD theme. |
 
+## 🦅 Homelander
+
+| | |
+|---|---|
+| **Flight** | Flies like he owns the sky — no thrusters, just a flag cape that hangs, flutters and streams behind him. Hovers with arms crossed, cruises fist-first, lands softly or with a one-knee "meteor" landing. Drop him and he simply stays in the air, annoyed. |
+| **Weapons** | **Heat vision** zaps and a long **sweeping beam** that scorches a whole line of enemies (and the floor), a **super punch** that sends them flying, a **flying ram** through a line, a **sonic clap** that stuns, and **grab & throw** — he lifts a tank overhead and hurls it into the crowd. |
+| **Approval** | His third meter is his public approval rating: wins and press conferences raise it, getting hurt or poked lowers it — and below 35% he gets faster and meaner. He takes less than half the damage anyone else would; at zero he lies dazed, then gets up furious. |
+| **Fights alone** | No allies — he beats a 1000-unit legendary army on his own. The nuke? He doesn't run; he crosses his arms and gets thrown anyway. |
+| **More** | Waves to fans, poses for the camera, checks his hair, stares at your cursor. Looks: classic, midnight, white gala. His home is *Vought Tower*. |
+
+## 👊 Hulk
+
+| | |
+|---|---|
+| **Leaps** | Hulk can't fly. He stomps along the floor (dust on every step) and gets everywhere else in giant leaps — onto flyers, to other screens, to the reminder spot — landing with a floor smash that dazes whatever stands nearby. |
+| **Smashing** | Punch combos that launch robots, a **ground smash** shockwave along the floor, a **thunderclap** that blows flyers away and wipes out incoming shots, a **leap-swat** that turns a drone into a missile, **boulders** ripped out of the floor, and **grab & throw** a tank at the biggest group. |
+| **Rage** | Rage builds while he fights and when he's hurt and boosts his damage; at 100% he goes on a 9-second **HULK SMASH** rampage. Health regenerates fast; stamina pays for leaps and smashes. |
+| **Knocked out** | He collapses and turns into a small, apologetic **Bruce Banner** — then grows back with a gamma flash and a roar. *Hulk → Bruce Banner* in the menu does it on purpose. |
+| **More** | "HULK NOT TOY!" when you pick him up; dropped, he smashes the floor. Sleeps sitting up in quiet mode. Skins: green, grey, savage. His home is *Gamma Base*. |
+
+## 🕷️ Spider-Man
+
+| | |
+|---|---|
+| **Web-swinging** | Spider-Man can't fly either: he swings in pendulum arcs from webs stuck to the top of your screen (never dipping into the floor), zips straight to exact spots, flips and lands in a three-point crouch, and hangs upside-down from a thread. Drop him and he catches a web. |
+| **Fighting** | **Web shots** stick enemies in place (webbed flyers sink, webbed walkers can't shoot), **web-zip kicks**, **web-yank** a drone down and slam it, whirl a walker overhead and fling it, **impact webs** that snare a whole group, spider-sense dodges and punch/kick combos. |
+| **Spider-Verse** | In an army battle up to 5 other spider-heroes swing in — Miles, Gwen, 2099, Noir, the black suit, Iron Spider… A worn-out ally taps out through a portal and a fresh one arrives. |
+| **More** | Delivers reminders hanging upside-down in the middle of the screen; naps upside-down in a corner in quiet mode. Meters: web fluid, health, impact webs. Seven suits. |
+
 ## ⏰ Reminders
 
 Home window → **Reminders**: pick a time and type what you need to do
@@ -113,13 +142,13 @@ installers from the run's *Artifacts*. Builds are unsigned (macOS: right-click �
 
 ## Controls
 
-| Do this | Cat | Iron Man |
+| Do this | Cat | Heroes |
 |---|---|---|
-| Right-click (anywhere / on it) | care menu | suit menu |
+| Right-click (anywhere / on it) | care menu | hero menu |
 | ⌘⌥⇧K / Ctrl+Alt+Shift+K | menu at the cursor | menu at the cursor |
-| Drag | carry by the scruff | carry him; he hovers when released |
-| Click | boop | thumbs-up / quips |
-| Hover | needs card | power / armor / missiles card |
+| Drag | carry by the scruff | carry them — Iron Man & Homelander hover, Hulk smashes down, Spider-Man webs up |
+| Click | boop | quips |
+| Hover | needs card | the hero's meters |
 | Stroke back & forth | petting, purring | — |
 | Click an enemy | — | lock target |
 | Esc (needs global hook) | put tool away | snooze a briefing |
@@ -161,8 +190,8 @@ src/home/                 Home window (Cat Home / HQ), reminders editor
 
 ### Developing
 
-- `npm test` — headless cat, multi-monitor and hero/combat/army/nuke/reminder tests
-  (including a full 1000-unit battle).
+- `npm test` — headless cat, multi-monitor and hero/combat/army/nuke/reminder tests for
+  every hero (each including a full 1000-unit battle).
 - `dev/gallery.html` — every pose, face, prop, hero pose and enemy (serve the folder,
   e.g. `python3 -m http.server`, then open `/dev/gallery.html?mode=iron`, or
   `?mode=hero&hero=hulk`). `npx electron dev/shot.js "dev/gallery.html?mode=hero&hero=spiderman" out.png`

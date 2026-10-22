@@ -179,7 +179,201 @@
       ctx.stroke(); ctx.restore();
       ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, TAU); ctx.fillStyle = '#ffc93c'; ctx.fill();
     },
+    gift(ctx, T) {
+      // a little wrapped present
+      ctx.save();
+      ctx.rotate(0.06 * sin(T * 3));
+      ctx.beginPath(); rrect(ctx, -8, -2, 16, 11, 1.5);
+      ctx.fillStyle = '#ff5c8a'; ctx.fill(); ctx.lineWidth = 1.1; ctx.strokeStyle = '#b82a57'; ctx.stroke();
+      ctx.beginPath(); rrect(ctx, -9.5, -6, 19, 5, 1.5);
+      ctx.fillStyle = '#ff7aa2'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffd84d';
+      ctx.fillRect(-1.6, -6, 3.2, 15);
+      ctx.strokeStyle = '#c99a1c'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(-3.6, -8, 3.4, 2.2, -0.5, 0, TAU);
+      ctx.moveTo(7, -8);
+      ctx.ellipse(3.6, -8, 3.4, 2.2, 0.5, 0, TAU);
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -7, 1.6, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    },
+    tomato(ctx, T) {
+      // the focus-timer tomato
+      ctx.save();
+      ctx.translate(0, 1.5 + 0.5 * sin(T * 2));
+      ctx.beginPath(); ctx.ellipse(0, 1, 9, 7.6, 0, 0, TAU);
+      const g = ctx.createRadialGradient(-3, -2, 1, 0, 1, 10);
+      g.addColorStop(0, '#ff8a7a'); g.addColorStop(1, '#e0362c');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.lineWidth = 1.1; ctx.strokeStyle = '#9e1f17'; ctx.stroke();
+      ctx.fillStyle = '#4caf50'; ctx.strokeStyle = '#2e7d32'; ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = -PI / 2 + (i - 2) * 0.62;
+        ctx.moveTo(0, -6); ctx.quadraticCurveTo(cos(a - 0.3) * 4, -6 + sin(a - 0.3) * 2.5, cos(a) * 5.5, -6 + sin(a) * 1.2 + 2.2);
+        ctx.quadraticCurveTo(cos(a + 0.3) * 3, -6 + sin(a + 0.3) * 1.5, 0, -6);
+      }
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0.8, -9.5); ctx.lineWidth = 1.4; ctx.strokeStyle = '#2e7d32'; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-3.5, -1.5, 2, 1.2, -0.6, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();
+      ctx.restore();
+    },
+    feather(ctx, T) {
+      ctx.save();
+      ctx.translate(0, -7);
+      ctx.scale(0.9, 0.9);
+      lureBody(ctx, T);
+      ctx.restore();
+    },
   };
+
+  // The feathered lure of the wand toy: bead at the origin, three feathers hanging below it.
+  function lureBody(ctx, T) {
+    const fl = sin(T * 7.5);
+    const feathers = [[-0.5, '#2ec4b6', '#178f84'], [0.45, '#ff5c93', '#c42a64'], [-0.02, '#ffd84d', '#c99a1c']];
+    for (const [a0, col, edge] of feathers) {
+      const a = a0 + 0.12 * fl * (a0 >= 0 ? 1 : -1);
+      ctx.save();
+      ctx.rotate(a);
+      const L = a0 === -0.02 ? 17 : 14;
+      ctx.beginPath();
+      ctx.moveTo(0, 1);
+      ctx.quadraticCurveTo(-4.6, L * 0.45, -0.6, L);
+      ctx.quadraticCurveTo(0, L + 1.2, 0.6, L);
+      ctx.quadraticCurveTo(4.6, L * 0.45, 0, 1);
+      ctx.closePath();
+      ctx.fillStyle = col; ctx.fill();
+      ctx.lineWidth = 0.8; ctx.strokeStyle = edge; ctx.stroke();
+      // shaft and barbs
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(0, 1.5); ctx.lineTo(0, L - 1);
+      for (let k = 0.3; k < 0.95; k += 0.17) { ctx.moveTo(0, L * k); ctx.lineTo(-2.4, L * k + 2); ctx.moveTo(0, L * k); ctx.lineTo(2.4, L * k + 2); }
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, TAU);
+    ctx.fillStyle = '#7a66ff'; ctx.fill(); ctx.lineWidth = 0.8; ctx.strokeStyle = '#4b3bb0'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(-0.8, -0.8, 0.8, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+  }
+
+  // ---------------------------------------------------------------- gifts the cat brings
+  // Small floor items, ~20 units wide, origin = bottom centre (on the floor).
+  const GIFTS = [
+    ['mouse', 'Toy mouse', '🐭'], ['feather', 'Feather', '🪶'], ['leaf', 'Leaf', '🍂'],
+    ['flower', 'Flower', '🌼'], ['sock', 'Sock', '🧦'], ['bottlecap', 'Bottle cap', '🧢'],
+    ['ribbon', 'Ribbon', '🎀'], ['button', 'Button', '🔘'], ['paperball', 'Paper ball', '📄'],
+  ];
+
+  // carried: in the cat's mouth (no floor shadow; lifted so its top meets the mouth when
+  // placed like a carried file — translate(mouth.x + 3, mouth.y + 15), scale 0.62)
+  function drawGift(ctx, kind, T, carried) {
+    ctx.save();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    if (carried) ctx.translate(0, -14);
+    else { ctx.beginPath(); ctx.ellipse(0, 0, 10, 2.2, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,0.13)'; ctx.fill(); }
+    switch (kind) {
+      case 'mouse': {
+        ctx.translate(8, -3.9); ctx.scale(0.55, 0.55);
+        TOOLS.mouse(ctx, 0.3, 0, true);
+        break;
+      }
+      case 'feather': {
+        ctx.translate(0, -2.5); ctx.rotate(-1.35);
+        ctx.beginPath(); ctx.moveTo(-1, -9); ctx.quadraticCurveTo(-5, 0, -0.5, 9); ctx.quadraticCurveTo(0, 10, 0.5, 9); ctx.quadraticCurveTo(5, 0, 1, -9); ctx.closePath();
+        const g = ctx.createLinearGradient(0, -9, 0, 9); g.addColorStop(0, '#8fd8ff'); g.addColorStop(1, '#7a66ff');
+        ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 0.8; ctx.strokeStyle = '#4b3bb0'; ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(0, 8);
+        for (let y = -6; y < 7; y += 3) { ctx.moveTo(0, y); ctx.lineTo(-2.6, y + 2); ctx.moveTo(0, y); ctx.lineTo(2.6, y + 2); }
+        ctx.stroke();
+        break;
+      }
+      case 'leaf': {
+        ctx.translate(0, -3); ctx.rotate(-0.25);
+        ctx.beginPath(); ctx.moveTo(-10, 0); ctx.quadraticCurveTo(-2, -9, 9, -1); ctx.quadraticCurveTo(-1, 7, -10, 0); ctx.closePath();
+        const g = ctx.createLinearGradient(-10, 0, 9, 0); g.addColorStop(0, '#ffb02e'); g.addColorStop(1, '#e0582c');
+        ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 0.9; ctx.strokeStyle = '#9a3a14'; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-12, 1); ctx.lineTo(7, -1);
+        for (const x of [-5, -1, 3]) { ctx.moveTo(x, -0.4); ctx.lineTo(x + 3, -3.5); ctx.moveTo(x, -0.4); ctx.lineTo(x + 3, 2.6); }
+        ctx.lineWidth = 0.7; ctx.stroke();
+        break;
+      }
+      case 'flower': {
+        ctx.strokeStyle = '#4f9f4f'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(-10, -1.5); ctx.quadraticCurveTo(-3, -1, 3, -4); ctx.stroke();
+        ctx.fillStyle = '#5cae4f';
+        ctx.beginPath(); ctx.ellipse(-4, -3.5, 2.6, 1.2, -0.5, 0, TAU); ctx.fill();
+        ctx.translate(5, -5.5);
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#b8b0c8'; ctx.lineWidth = 0.6;
+        for (let i = 0; i < 8; i++) { const a = i * TAU / 8; ctx.beginPath(); ctx.ellipse(cos(a) * 3.4, sin(a) * 3.4, 2.6, 1.3, a, 0, TAU); ctx.fill(); ctx.stroke(); }
+        ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, TAU); ctx.fillStyle = '#ffc93c'; ctx.fill(); ctx.strokeStyle = '#c99a1c'; ctx.stroke();
+        break;
+      }
+      case 'sock': {
+        ctx.translate(0, -1);
+        const sock = () => {
+          ctx.beginPath();
+          ctx.moveTo(-9, -12); ctx.lineTo(-2, -12); ctx.lineTo(-2, -5); ctx.quadraticCurveTo(-1, -3, 4, -4);
+          ctx.quadraticCurveTo(10, -4, 10, -1); ctx.quadraticCurveTo(10, 1, 4, 1); ctx.lineTo(-6, 1); ctx.quadraticCurveTo(-9, 1, -9, -3); ctx.closePath();
+        };
+        sock(); ctx.fillStyle = '#ffffff'; ctx.fill();
+        ctx.save(); ctx.clip();
+        ctx.fillStyle = '#ff6b6b'; for (const y of [-11, -7.5]) ctx.fillRect(-10, y, 9, 2);
+        ctx.fillStyle = '#5d7cf0'; ctx.beginPath(); ctx.arc(9, -1.5, 3.4, 0, TAU); ctx.fill(); ctx.fillRect(-10, -1.4, 6, 3);
+        ctx.restore();
+        sock(); ctx.lineWidth = 0.9; ctx.strokeStyle = '#6d7088'; ctx.stroke();
+        break;
+      }
+      case 'bottlecap': {
+        ctx.translate(0, -3);
+        ctx.beginPath(); ctx.ellipse(0, 0.5, 7.5, 3.2, 0, 0, PI); ctx.lineTo(-7.5, -2); ctx.ellipse(0, -2, 7.5, 3.2, 0, PI, 0, true); ctx.closePath();
+        ctx.fillStyle = '#b81f2a'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 0.7;
+        ctx.beginPath(); for (let x = -6.5; x <= 6.5; x += 1.6) { ctx.moveTo(x, -1.2 + abs(x) * 0.05); ctx.lineTo(x, 1.6 - abs(x) * 0.1); } ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, -2, 7.5, 3.2, 0, 0, TAU);
+        ctx.fillStyle = '#e8343f'; ctx.fill(); ctx.lineWidth = 0.9; ctx.strokeStyle = '#7d1418'; ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, -2, 4.4, 1.8, 0, 0, TAU); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.stroke();
+        break;
+      }
+      case 'ribbon': {
+        ctx.translate(0, -5);
+        ctx.fillStyle = '#ff4f86'; ctx.strokeStyle = '#a3204f'; ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.moveTo(-1, 1); ctx.lineTo(-5, 5); ctx.lineTo(-3, 5.5); ctx.lineTo(-1.5, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(1, 1); ctx.lineTo(6, 5); ctx.lineTo(4, 5.6); ctx.lineTo(2, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+        for (const sd of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(sd * 9, -8, sd * 8, 1); ctx.quadraticCurveTo(sd * 5, 3, 0, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.2, 2.6, 0, 0, TAU); ctx.fillStyle = '#e0306f'; ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'button': {
+        ctx.translate(0, -3.2);
+        ctx.beginPath(); ctx.ellipse(0, 0.9, 7, 3.4, 0, 0, TAU); ctx.fillStyle = '#2f5fb8'; ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, 0, 7, 3.4, 0, 0, TAU); ctx.fillStyle = '#5d8cf0'; ctx.fill();
+        ctx.lineWidth = 0.9; ctx.strokeStyle = '#1f3f80'; ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, 0, 5, 2.3, 0, 0, TAU); ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.stroke();
+        ctx.fillStyle = '#1f3f80';
+        for (const [x, y] of [[-1.5, -0.7], [1.5, -0.7], [-1.5, 0.7], [1.5, 0.7]]) { ctx.beginPath(); ctx.ellipse(x, y, 0.75, 0.4, 0, 0, TAU); ctx.fill(); }
+        break;
+      }
+      case 'paperball': {
+        ctx.translate(0, -6);
+        const R = rng(7);
+        ctx.beginPath();
+        for (let i = 0; i < 11; i++) { const a = i * TAU / 11, rr = 5.4 + R() * 1.8; i ? ctx.lineTo(cos(a) * rr, sin(a) * rr) : ctx.moveTo(cos(a) * rr, sin(a) * rr); }
+        ctx.closePath();
+        ctx.fillStyle = '#fbfbfe'; ctx.fill(); ctx.lineWidth = 0.9; ctx.strokeStyle = '#8f93aa'; ctx.stroke();
+        ctx.strokeStyle = 'rgba(120,124,150,0.55)'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(-4, -2); ctx.lineTo(0, 0.5); ctx.lineTo(3.5, -3); ctx.moveTo(0, 0.5); ctx.lineTo(1, 4.5); ctx.moveTo(-3.5, 3); ctx.lineTo(0, 0.5); ctx.stroke();
+        ctx.strokeStyle = 'rgba(110,140,230,0.5)';
+        ctx.beginPath(); ctx.moveTo(-5, 0.8); ctx.lineTo(-1.5, 2.4); ctx.moveTo(1.5, -4.4); ctx.lineTo(4.5, -1.6); ctx.stroke();
+        break;
+      }
+      default: break;
+    }
+    ctx.restore();
+  }
 
   function drawIcon(ctx, name, T) {
     const fn = ICONS[name];
@@ -685,6 +879,19 @@
       ctx.restore();
     },
 
+    // The lure alone, as held in the cat's mouth: the string's end at (0,-24),
+    // the bead at (0,-14), feathers hanging down to the origin.
+    featherLure(ctx, T) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(90,90,110,0.85)'; ctx.lineWidth = 0.8; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -24); ctx.quadraticCurveTo(1.5, -19, 0, -14); ctx.stroke();
+      ctx.translate(0, -14);
+      lureBody(ctx, T);
+      ctx.restore();
+    },
+
+    gift(ctx, kind, T, carried) { drawGift(ctx, kind, T, carried); },
+
     flowerBunch(ctx) {
       for (let i = 0; i < 3; i++) {
         const fx = (i - 1) * 4;
@@ -804,6 +1011,22 @@
       ctx.beginPath(); star(ctx, 22, 2, 3, 4, 0.4); ctx.fillStyle = '#ffd84d'; ctx.fill();
       ctx.globalAlpha = 1;
     },
+    feather(ctx, T) {
+      // the feather wand: lure at the hot spot, string up to the stick's tip, stick off to the upper right
+      const sway = 2.2 * sin(T * 2.3);
+      const tip = { x: 34 + sway, y: -44 };
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(80,80,100,0.85)'; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(14 + sway * 2, -14, tip.x, tip.y); ctx.stroke();
+      ctx.lineWidth = 3.4; ctx.strokeStyle = '#8a5a2e';
+      ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(tip.x + 26, tip.y - 14); ctx.stroke();
+      ctx.lineWidth = 1.6; ctx.strokeStyle = '#c98a4b';
+      ctx.beginPath(); ctx.moveTo(tip.x + 1, tip.y - 1); ctx.lineTo(tip.x + 26, tip.y - 14.5); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, 1.8, 0, TAU); ctx.fillStyle = '#5a3a1e'; ctx.fill();
+      lureBody(ctx, T);
+      ctx.restore();
+    },
     hand(ctx, T) {
       // petting hand hint (paw-shaped)
       ctx.beginPath(); ctx.ellipse(0, 4, 7, 6, 0, 0, TAU);
@@ -861,6 +1084,15 @@
         ctx.fillStyle = 'rgba(235,236,245,0.8)'; ctx.fill();
       }
     },
+    confetti(ctx, p) {
+      // tumbling paper bits for level-ups (color from p.color, else picked from the spin)
+      const cols = ['#ff5c93', '#ffd84d', '#2ec4b6', '#7a66ff', '#ff8a3d', '#5d8cf0'];
+      const col = p.color || cols[Math.floor(abs(p.rot) * 997) % cols.length];
+      ctx.rotate(p.rot + p.k * 7);
+      ctx.scale(p.size, p.size * (0.25 + 0.75 * abs(cos(p.k * 18 + p.rot))));
+      ctx.fillStyle = col;
+      ctx.fillRect(-2.4, -1.4, 4.8, 2.8);
+    },
     drop(ctx, p) {
       ctx.beginPath(); ctx.arc(0, 0, 1.5 * p.size, 0, TAU); ctx.fillStyle = p.color || '#ffffff'; ctx.fill();
       ctx.lineWidth = 0.5; ctx.strokeStyle = 'rgba(150,160,190,0.7)'; ctx.stroke();
@@ -913,7 +1145,14 @@
     { name: 'tool laser', draw: (c, T) => TOOLS.laser(c, T) },
     { name: 'tool treat', draw: (c, T) => TOOLS.treat(c, T) },
     { name: 'status', draw: (c, T) => drawStatus(c, 0, 10, { food: 30, energy: 70, fun: 50, clean: 90, health: 15 }, 'Mochi', 'hungry', 1) },
+    { name: 'tool feather', draw: (c, T) => TOOLS.feather(c, T) },
+    { name: 'feather lure', draw: (c, T) => PROPS.featherLure(c, T) },
+    { name: 'bubble gift', draw: (c, T) => drawBubble(c, -14, 10, 'gift', 1, T, false) },
+    { name: 'bubble tomato', draw: (c, T) => drawBubble(c, -14, 10, 'tomato', 1, T, false) },
+    { name: 'bubble feather', draw: (c, T) => drawBubble(c, -14, 10, 'feather', 1, T, false) },
+    ...GIFTS.map(([k]) => ({ name: 'gift ' + k, draw: (c, T) => { c.scale(1.6, 1.6); PROPS.gift(c, k, T); } })),
+    { name: 'confetti', draw: (c, T) => { for (let i = 0; i < 14; i++) { c.save(); c.translate(-30 + (i % 7) * 10, -20 + Math.floor(i / 7) * 16); PARTICLES.confetti(c, { k: (T * 0.3 + i * 0.07) % 1, rot: i * 0.37, size: 1.4 }); c.restore(); } } },
   ];
 
-  root.PropsArt = { ICONS, PROPS, TOOLS, PARTICLES, drawIcon, drawBubble, drawLabel, drawStatus, rng, GALLERY, star, heart, rrect };
+  root.PropsArt = { ICONS, PROPS, TOOLS, PARTICLES, GIFTS, drawIcon, drawBubble, drawLabel, drawStatus, rng, GALLERY, star, heart, rrect };
 })(typeof window !== 'undefined' ? window : globalThis);

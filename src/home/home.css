@@ -92,7 +92,41 @@ body[data-platform="darwin"] .switcher { padding-left: 84px; margin-top: -24px; 
 .switcher.many .char small { display: none; }
 .switcher.many .char span { min-width: 0; max-width: 100%; }
 body[data-character="cat"] .only-hero, body:not([data-character="cat"]) .only-cat { display: none !important; }
+body:not([data-extras="1"]) .only-extras, body:not([data-character="cat"]) .only-extras { display: none !important; }
 .hero .dot { color: var(--sub); }
+
+/* ------------------------------------------------------------ Desktop Cat: bond level, focus, wardrobe, gifts */
+.bond { margin-bottom: 10px; }
+.bond-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.bond-top b { font-size: 15px; color: var(--accent); }
+.bond-bar { height: 10px; border-radius: 6px; background: rgba(150, 90, 40, 0.14); overflow: hidden; margin: 8px 0 6px; }
+.bond-bar span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #ffb35c, #e8743b); transition: width 0.5s ease; }
+.bond p { margin: 0; }
+.focus { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.focus-btns { display: flex; gap: 6px; }
+.wardrobe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.qa.ward canvas { width: 64px; height: 64px; }
+.qa.ward.locked { opacity: 0.55; }
+.gifts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.gifts > p { grid-column: 1 / -1; margin: 0; }
+.gift { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.gift canvas { width: 48px; height: 40px; }
+.gift b { font-size: 13px; color: var(--accent); }
+.gift span { font-size: 11px; color: var(--sub); text-align: center; }
+
+/* ------------------------------------------------------------ Desktop Cat: cozy theme */
+body[data-theme="cozy"] {
+  --bg: #fff7ec; --card: #ffffff; --fg: #4a2f1f; --sub: #a07a62; --line: rgba(150, 90, 40, 0.13);
+  --accent: #e8743b; --accent2: #ffc58f; --hover: rgba(232, 116, 59, 0.1); --warn: #d9463b;
+}
+@media (prefers-color-scheme: dark) {
+  body[data-theme="cozy"] { --bg: #241914; --card: #2f221b; --fg: #ffe9d6; --sub: #c9a58a; --line: rgba(255, 200, 150, 0.1); --hover: rgba(255, 160, 100, 0.13); }
+}
+body[data-theme="cozy"] .hero { background: linear-gradient(160deg, rgba(255, 179, 92, 0.35), rgba(42, 161, 152, 0.12) 70%, transparent); }
+body[data-theme="cozy"] .name { color: var(--accent); font-weight: 800; }
+body[data-theme="cozy"] .needs, body[data-theme="cozy"] .card, body[data-theme="cozy"] .stat,
+body[data-theme="cozy"] .qa, body[data-theme="cozy"] .rem, body[data-theme="cozy"] .char { border-radius: 16px; }
+body[data-theme="cozy"] .stat b { color: var(--accent); }
 .card.pad { padding: 12px 14px; }
 .next { color: var(--accent); font-weight: 600; margin: 12px 2px 6px; }
 

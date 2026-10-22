@@ -139,6 +139,12 @@
     dig: () => { for (let i = 0; i < 4; i++) hiss('bandpass', 1400 + Math.random() * 600, 1.5, 0.06, 0.18, i * 0.16); },
     scratch: () => hiss('bandpass', 3200, 3, 0.13, 0.3, 0, 1400),
     pop: () => blip('sine', 500, 1300, 0.07, 0.3),
+    // ---- Desktop Cat extras
+    bell: () => { const f = 3100 + Math.random() * 300; blip('sine', f, f * 0.995, 0.28, 0.05); blip('sine', f * 1.51, f * 1.5, 0.18, 0.025, 0.01); },
+    levelUp: () => { [523, 659, 784, 1046, 1318].forEach((f, i) => blip('triangle', f, f, 0.16, 0.11, i * 0.08)); blip('sine', 2093, 2093, 0.5, 0.06, 0.42); },
+    flutter: () => { for (let i = 0; i < 5; i++) hiss('bandpass', 2400 + Math.random() * 900, 2.2, 0.04, 0.09, i * 0.05); },
+    gift: () => { [880, 1175, 1568].forEach((f, i) => blip('sine', f, f, 0.12, 0.1, i * 0.07)); hiss('highpass', 4000, 0.7, 0.12, 0.05, 0.15); },
+    focusStart: () => { blip('sine', 784, 784, 0.18, 0.08); blip('sine', 1046, 1046, 0.3, 0.07, 0.18); },
     thud: () => { blip('sine', 140, 45, 0.14, 0.5); hiss('lowpass', 300, 0.7, 0.06, 0.2); },
     hiss: () => hiss('highpass', 2600, 0.6, 0.6, 0.35, 0, 5000),
     chirp: () => { for (let i = 0; i < 4; i++) blip('triangle', 1500, 1100, 0.05, 0.12, i * 0.085); },

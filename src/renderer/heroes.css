@@ -1,5 +1,41 @@
-/* Desktop Buddies — menu & reminder-panel themes for Homelander, Hulk and Spider-Man
-   (Iron Man's HUD theme lives in overlay.css). */
+/* Desktop Buddies — menu & reminder-panel themes for Homelander, Hulk, Spider-Man and the
+   standalone Desktop Cat ("cozy"). Iron Man's HUD theme lives in overlay.css. */
+
+/* ------------------------------------------------------------ Desktop Cat: cozy */
+.menu[data-theme="cozy"], .brief[data-theme="cozy"] {
+  --menu-bg: rgba(255, 250, 242, 0.98); --menu-fg: #4a2f1f; --menu-sub: #a07a62;
+  --menu-line: rgba(150, 90, 40, 0.14); --menu-hover: rgba(232, 116, 59, 0.12); --menu-accent: #e8743b;
+  --bar-bg: rgba(150, 90, 40, 0.13);
+  background: var(--menu-bg); color: var(--menu-fg);
+  border: 1px solid rgba(232, 116, 59, 0.35);
+  box-shadow: 0 14px 40px rgba(90, 45, 10, 0.25), 0 2px 8px rgba(90, 45, 10, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  .menu[data-theme="cozy"], .brief[data-theme="cozy"] {
+    --menu-bg: rgba(46, 32, 26, 0.98); --menu-fg: #ffe9d6; --menu-sub: #c9a58a;
+    --menu-line: rgba(255, 200, 150, 0.12); --menu-hover: rgba(255, 160, 100, 0.16); --bar-bg: rgba(255, 200, 150, 0.12);
+    border-color: rgba(255, 150, 90, 0.35);
+  }
+}
+.menu[data-theme="cozy"] { border-radius: 18px; }
+.menu[data-theme="cozy"] .item { border-radius: 11px; }
+.menu[data-theme="cozy"] .item:hover, .menu[data-theme="cozy"] .item.open { background: var(--menu-hover); }
+.menu[data-theme="cozy"] .name { color: #e8743b; font-weight: 800; }
+.menu[data-theme="cozy"] .check, .menu[data-theme="cozy"] .item.accent .tx { color: #e8743b; }
+.menu[data-theme="cozy"] .sep, .menu[data-theme="cozy"] .meters, .menu[data-theme="cozy"] .foot { border-color: var(--menu-line); }
+.menu[data-theme="cozy"] .sep { background: var(--menu-line); }
+.menu[data-theme="cozy"] .avatar { box-shadow: 0 0 0 2px #ffd29a; background: #fff1de; }
+.menu .name .lvl {
+  display: inline-block; margin-left: 7px; padding: 1px 7px; border-radius: 9px; vertical-align: 2px;
+  background: linear-gradient(180deg, #ffb35c, #e8743b); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: 0.3px;
+}
+.brief[data-theme="cozy"] { border-radius: 20px; }
+.brief[data-theme="cozy"]::after { background: var(--menu-bg); border-color: rgba(232, 116, 59, 0.35); }
+.brief[data-theme="cozy"] .brief-head { color: #e8743b; }
+.brief[data-theme="cozy"] .brief-task { color: var(--menu-fg); }
+.brief[data-theme="cozy"] .brief-quip { color: var(--menu-sub); }
+.brief[data-theme="cozy"] button { border-color: rgba(232, 116, 59, 0.5); color: #e8743b; border-radius: 12px; }
+.brief[data-theme="cozy"] button.primary { background: #e8743b; color: #fff; border-color: #e8743b; }
 
 /* ------------------------------------------------------------ Homelander: Vought corporate */
 .menu[data-theme="vought"], .brief[data-theme="vought"] {

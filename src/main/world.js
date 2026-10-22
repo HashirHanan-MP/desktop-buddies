@@ -2285,7 +2285,12 @@ class World {
   }
 
   onSetting(key, value) {
-    if (key === 'palette') this.cat.palette = value;
+    if (key === 'palette') {
+      this.cat.palette = value;
+      // Desktop Cat coats: siamese cats have blue eyes, the others green or amber
+      if (this.extras && value === 'siamese') this.cat.eyes = 'blue';
+      else if (this.extras && this.cat.eyes === 'blue') this.cat.eyes = 'green';
+    }
     if (key === 'eyes') this.cat.eyes = value;
     if (key === 'size') this.placeCatOnScreen(false);
     this.dirty();

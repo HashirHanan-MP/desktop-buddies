@@ -28,9 +28,23 @@
 <main>
   <!-- ======================= cat -->
   <section id="tab-cat" class="tab on">
+    <div class="card pad bond only-extras">
+      <div class="bond-top"><b id="bondLevel">Level 1</b><span id="bondNext" class="muted small"></span></div>
+      <div class="bond-bar"><span id="bondFill"></span></div>
+      <p class="muted small" id="bondHint">Feed, pet, play, clean up and focus together to raise your bond and unlock outfits.</p>
+    </div>
     <div id="needs" class="needs"></div>
     <h3>Quick care</h3>
     <div class="grid" id="quick"></div>
+    <h3 class="only-extras">Focus timer</h3>
+    <div class="card pad focus only-extras">
+      <span id="focusText">Your cat naps in the corner while you work, then tells you when it's break time.</span>
+      <span class="focus-btns" id="focusBtns"></span>
+    </div>
+    <h3 class="only-extras">Wardrobe</h3>
+    <div class="wardrobe only-extras" id="wardrobe"></div>
+    <h3 class="only-extras">Gift shelf</h3>
+    <div class="gifts only-extras" id="giftShelf"></div>
     <h3>Life together</h3>
     <div class="stats" id="stats"></div>
   </section>
@@ -141,6 +155,16 @@
       <h4>🐭 Play</h4>
       <p>Mouse chase turns your cursor into a mouse the cat hunts — hold still and it might catch you! Also try the laser, yarn, a box, catnip and the brush.</p>
     </div>
+    <div class="card pad only-extras">
+      <h4>⭐ Bond level &amp; outfits</h4>
+      <p>Everything you do together — meals, petting, play, cleaning up, focusing — earns bond points. Each level unlocks an outfit: bow tie, bandana, flower crown, party hat, glasses, scarf and finally a crown. <i>Dress up</i> in the menu or the Wardrobe here.</p>
+      <h4>🪶 Feather wand</h4>
+      <p><i>Play → Feather wand</i> dangles a feather from your cursor. Hold it above the cat: it crouches, wiggles and leaps straight up to grab it. Pull it away to make it let go.</p>
+      <h4>🍅 Focus timer</h4>
+      <p>Start a 15, 25 or 50-minute focus session: the cat naps in the corner, quietly, with a little timer above it (its needs pause too). When time's up it comes over to tell you it's break time.</p>
+      <h4>🎁 Gifts</h4>
+      <p>A happy, well-loved cat sometimes goes off exploring and brings you a little present — a feather, a leaf, a sock… Click it to keep it on your Gift shelf.</p>
+    </div>
     <div class="card pad only-hero" id="heroHelp"></div>
     <div class="card pad">
       <h4>⏰ Reminders</h4>
@@ -155,6 +179,7 @@
   </div>
 </main>
 <script src="../renderer/catArt.js"></script>
+<script src="../renderer/props.js"></script>
 <script src="../renderer/ironArt.js"></script>
 <script src="../renderer/heroes/homelander.js"></script>
 <script src="../renderer/heroes/hulk.js"></script>

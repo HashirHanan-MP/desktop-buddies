@@ -9,7 +9,12 @@
 
 const EDITIONS = {
   all: { appName: 'Desktop Buddies', appId: 'app.desktopbuddies', characters: ['cat', 'ironman', 'homelander', 'hulk', 'spiderman'], icon: 'icon.png' },
-  cat: { appName: 'Desktop Cat', appId: 'app.desktopbuddies.cat', characters: ['cat'], icon: 'icon.png' },
+  // the standalone cat app has its own cat: a ginger tabby with a collar & bell, plus levels,
+  // outfits, a focus timer, the feather wand and gifts (World `extras`), its own logo and theme
+  cat: {
+    appName: 'Desktop Cat', appId: 'app.desktopbuddies.cat', characters: ['cat'], icon: 'icon-desktopcat.png',
+    catExtras: true, defaults: { palette: 'tabby', accessory: 'collar' }, trays: { cat: 'tray-desktopcat.png' },
+  },
   homelander: { appName: 'Desktop Homelander', appId: 'app.desktopbuddies.homelander', characters: ['homelander'], icon: 'icon-homelander.png' },
   hulk: { appName: 'Desktop Hulk', appId: 'app.desktopbuddies.hulk', characters: ['hulk'], icon: 'icon-hulk.png' },
   spiderman: { appName: 'Desktop Spider-Man', appId: 'app.desktopbuddies.spiderman', characters: ['spiderman'], icon: 'icon-spiderman.png' },

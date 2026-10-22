@@ -38,18 +38,21 @@ const DIFF = { easy: { hp: 0.8, dmg: 0.5, rate: 0.75 }, normal: { hp: 1, dmg: 1,
 const INVASIONS = { off: null, rare: [20 * 60, 40 * 60], often: [4 * 60, 9 * 60] };
 
 // The enemies: Ultron's robot army, and the villains as bosses (boss: true).
-// r = hit radius, cy = centre height above the feet (0 for flyers). Galactus is a giant
-// whose hit circle covers his legs, so every hero (even one who can't fly) can reach him.
+// r = hit radius, cy = centre height above the feet (0 for flyers); villains.js draws them to
+// the same sizes. Galactus is a giant whose hit circle covers his legs, so every hero (even one
+// who can't fly) can reach him; he is scaled to the screen (e.k), so his r/cy grow with it.
 const ENEMY = {
-  drone: { hp: 3, air: true, speed: 150, fire: [1.6, 3.0], dmg: 4, score: 1, r: 15, cy: 0, label: 'ULTRON SENTRY' },
-  mini: { hp: 1, air: true, speed: 240, kamikaze: true, dmg: 4, score: 1, r: 9, cy: 0, label: 'ULTRON DRONE' },
-  walker: { hp: 6, air: false, speed: 48, fire: [2.0, 3.2], dmg: 5, score: 2, r: 20, cy: -26, label: 'ULTRON SOLDIER' },
-  tank: { hp: 12, air: false, speed: 34, fire: [3.2, 4.6], dmg: 9, score: 3, r: 26, cy: -28, label: 'ULTRON HEAVY' },
-  thanos: { hp: 60, air: false, speed: 24, fire: [2.4, 3.4], dmg: 9, score: 12, r: 46, cy: -66, boss: true, label: 'THANOS' },
-  doom: { hp: 48, air: true, speed: 95, fire: [1.6, 2.6], dmg: 5, score: 10, r: 36, cy: 0, boss: true, label: 'DOCTOR DOOM' },
-  kang: { hp: 52, air: false, speed: 34, fire: [1.8, 2.8], dmg: 4, score: 10, r: 34, cy: -50, boss: true, label: 'KANG THE CONQUEROR' },
-  galactus: { hp: 150, air: false, speed: 0, fire: [3.0, 4.2], dmg: 12, score: 50, r: 150, cy: -150, boss: true, giant: true, label: 'GALACTUS' },
+  drone: { hp: 4, air: true, speed: 165, fire: [1.5, 2.7], dmg: 3, score: 1, r: 22, cy: 0, label: 'ULTRON SENTRY' },
+  mini: { hp: 1, air: true, speed: 260, kamikaze: true, dmg: 5, score: 1, r: 11, cy: 0, label: 'ULTRON DRONE' },
+  walker: { hp: 8, air: false, speed: 52, fire: [2.0, 3.1], dmg: 4, score: 2, r: 29, cy: -39, label: 'ULTRON SOLDIER' },
+  tank: { hp: 16, air: false, speed: 36, fire: [3.0, 4.2], dmg: 10, score: 3, r: 34, cy: -44, label: 'ULTRON PRIME' },
+  doombot: { hp: 6, air: true, speed: 140, fire: [1.7, 2.8], dmg: 4, score: 2, r: 24, cy: 0, label: 'DOOMBOT' },
+  thanos: { hp: 95, air: false, speed: 26, fire: [2.1, 3.0], dmg: 12, score: 15, r: 66, cy: -100, boss: true, label: 'THANOS' },
+  doom: { hp: 75, air: true, speed: 100, fire: [1.5, 2.4], dmg: 6, score: 12, r: 54, cy: 0, boss: true, label: 'DOCTOR DOOM' },
+  kang: { hp: 80, air: false, speed: 36, fire: [1.7, 2.6], dmg: 5, score: 12, r: 50, cy: -76, boss: true, label: 'KANG THE CONQUEROR' },
+  galactus: { hp: 220, air: false, speed: 0, fire: [2.6, 3.6], dmg: 14, score: 60, r: 212, cy: -212, boss: true, giant: true, label: 'GALACTUS' },
 };
+const GALACTUS_H = 930; // his full height (horns included) at e.k = 1; spawn() scales him to ~90% of the screen
 // older names still work ("boss" was the heavy mech, "swarm" the mini-drones)
 const ENEMY_ALIAS = { boss: 'thanos', mech: 'thanos', swarm: 'mini', ultron: 'walker' };
 const BOSSES = ['thanos', 'doom', 'kang']; // army bosses (Galactus only ends a legendary battle)
@@ -78,6 +81,11 @@ const IRON_LINES = {
   victory: QUIPS_WIN,
   bossDown: 'VILLAIN DOWN',
   bossBeam: 'INCOMING BEAM!',
+  snapWarn: 'HE\'S GOING TO SNAP!',
+  snapped: 'WHAT DID HE DO…?',
+  frozen: 'CAN\'T… MOVE…',
+  drained: 'POWER DRAINING!',
+  meteors: 'INCOMING METEORS!',
   locked: (label) => `TARGET LOCKED: ${label}`,
   invasion: 'INCOMING!',
   army: (total) => (total >= 1000 ? 'LEGENDARY BATTLE: 1000 HOSTILES' : `HOSTILE ARMY: ${total} UNITS`),
@@ -150,6 +158,8 @@ class Hero {
     if (old != null && v < old && this.suitForm.tough < 1) v = old - (old - v) * this.suitForm.tough;
     this._armor = v;
   }
+  // set health without the suit's toughness discount (Thanos's snap; the other heroes have their own)
+  setHealth(v) { this._armor = clamp(v, 0, 100); }
 
   line(key, ...a) {
     const L = this.constructor.LINES[key] != null ? this.constructor.LINES[key] : IRON_LINES[key];
@@ -210,6 +220,8 @@ class Hero {
     const w = this.w, s = this.s;
     if (this.mode === 'air') this.power -= (this.speed > 250 * s ? 0.8 : 0.45) * dt;
     else if (this.mode === 'ground' && !this.aim && this.pose !== 'unibeam') this.power += (this.pose === 'walk' ? 1.2 : 3) * dt;
+    // in a fight the arc reactor runs hot and trickles power back (a long villain fight stays winnable)
+    if (w.enemies.length && this.pose !== 'unibeam') this.power += 1.4 * dt;
     if (!w.enemies.length && this.mode !== 'down') this.armor += (this.mode === 'ground' ? 1.4 : 0.5) * dt;
     if (w.now - (this.lastMissileAt || 0) > 6000 && this.missiles < 12) { this.missiles++; this.lastMissileAt = w.now; }
     this.power = clamp(this.power, 0, 100);
@@ -222,6 +234,12 @@ class Hero {
     this.tickMeters(dt);
 
     const px = this.x, py = this.y;
+    // frozen in time (Kang): nothing moves until it wears off
+    if (this.frozen > 0) {
+      this.frozen = Math.max(0, this.frozen - dt);
+      if (this.mode === 'ground' || this.mode === 'air') { this.vx = 0; this.vy = 0; this.speed = 0; return; }
+      this.frozen = 0;
+    }
     if (this.mode === 'held') { this.tickHeld(dt); return; }
     if (this.mode === 'thrown') { this.tickThrown(dt); this.speed = Math.hypot(this.x - px, this.y - py) / dt; return; }
     if (this.mode === 'fall') { this.tickFall(dt); this.speed = Math.hypot(this.x - px, this.y - py) / dt; return; }
@@ -1229,6 +1247,9 @@ class HeroWorld {
     this.enemies = [];
     this.shots = [];
     this.beams = [];
+    this.strikes = []; // Doom's lightning storm: bolts marked on the floor, then striking
+    this.screenFlash = null; // a full-screen flash (Thanos's snap): { at, dur, color }
+    this.quake = null; // the floor shaking (Galactus's stomp): { at, dur, px }
     this.hud = [];
     this.diag = null;
     this.lockId = null;
@@ -1293,7 +1314,10 @@ class HeroWorld {
   onDisplaysChanged() { this.placeOnScreen(false); }
 
   // ------------------------------------------------------------ enemies
-  enemyCenter(e) { const s = this.s; return { x: e.x, y: e.y + ENEMY[e.kind].cy * s }; }
+  // an enemy's scale (world size × its own: only Galactus has one, to fit the screen), centre and hit radius
+  es(e) { return this.s * (e.k || 1); }
+  enemyCenter(e) { return { x: e.x, y: e.y + ENEMY[e.kind].cy * this.es(e) }; }
+  enemyR(e) { return ENEMY[e.kind].r * this.es(e); }
 
   spawn(kind, p, o) {
     o = o || {};
@@ -1302,22 +1326,28 @@ class HeroWorld {
     if (!k || this.enemies.length >= (o.max || 30)) return null;
     if (k.giant && this.enemies.some((x) => x.kind === kind)) return null; // one Galactus is plenty
     let q = this.geo.clampWork(p, 40 * s);
+    let gk = 0;
     if (k.giant) {
-      // the giant towers at the side of the screen nearest to where he was called
+      // the giant towers at the side of the screen nearest to where he was called, ~90% of its height
       const d = this.geo.displayAt(q) || this.geo.nearestDisplay(q);
-      q = { x: q.x < d.work.x + d.work.width / 2 ? d.work.x + 40 * s : d.work.x + d.work.width - 40 * s, y: d.work.y + d.work.height * 0.2 };
+      gk = clamp(d.work.height * 0.9 / (GALACTUS_H * s), 0.3, 2.5);
+      const inset = d.work.width * 0.06 + 70 * s * gk;
+      q = { x: q.x < d.work.x + d.work.width / 2 ? d.work.x + inset : d.work.x + d.work.width - inset, y: d.work.y + d.work.height * 0.2 };
     }
     const e = {
       id: uid('x'), kind, x: q.x, y: q.y, vx: 0, vy: 0, facing: q.x < this.hero.x ? 1 : -1,
       hp: k.hp * this.diff.hp, maxHp: k.hp * this.diff.hp, air: k.air, cool: rand(1, 2.5), phase: 0, charge: 0, hitAt: 0,
       orbit: rand(0, Math.PI * 2), range: rand(200, 330), alt: rand(60, 170), born: now(), state: 'idle', grounded: k.air,
     };
-    if (kind === 'doom') { e.range = rand(300, 380); e.alt = rand(110, 170); e.shieldAt = this.clock + rand(5000, 8000); }
-    if (kind === 'kang') e.warpAt = this.clock + rand(5000, 8000);
+    if (gk) { e.k = gk; e.drainAt = this.clock + rand(6000, 9000); }
+    if (kind === 'doom') { e.range = rand(320, 400); e.alt = rand(130, 190); e.shieldAt = this.clock + rand(5000, 8000); e.botAt = this.clock + rand(4000, 7000); }
+    if (kind === 'doombot') { e.range = rand(220, 340); e.alt = rand(80, 190); }
+    if (kind === 'kang') { e.warpAt = this.clock + rand(5000, 8000); e.freezeAt = this.clock + rand(3000, 6000); e.squadAt = this.clock + rand(8000, 12000); }
+    if (kind === 'thanos') e.portalAt = this.clock + rand(5000, 9000);
     if (o.vx) e.vx = o.vx;
     this.enemies.push(e);
     if (!o.silent) {
-      this.fx(kind === 'kang' ? 'timeportal' : 'portal', e.x, e.y + k.cy * s, { size: k.giant ? 5 : k.boss ? 2 : 1 });
+      this.fx(kind === 'kang' ? 'timeportal' : kind === 'doombot' ? 'doomport' : 'portal', e.x, e.y + k.cy * this.es(e), { size: k.giant ? 5 : k.boss ? 2.4 : 1 });
       this.sound(k.boss ? 'bossSpawn' : 'spawn', e);
     }
     this.dirty();
@@ -1336,7 +1366,7 @@ class HeroWorld {
     for (const e of this.enemies) {
       const d = dist(this.enemyCenter(e), h);
       const k = ENEMY[e.kind];
-      const threat = k.giant ? 3.5 : k.boss ? 3 : { tank: 1.5, walker: 1.2, drone: 1, mini: 1.4 }[e.kind] || 1;
+      const threat = k.giant ? 3.5 : k.boss ? 3 : { tank: 1.5, walker: 1.2, drone: 1, mini: 1.4, doombot: 1.3 }[e.kind] || 1;
       // spread the suits over different targets
       const taken = others.reduce((a, x) => a + (x.targetId === e.id ? 1 : 0), 0);
       const score = threat * 400 - d * 0.6 - taken * 260;
@@ -1351,7 +1381,7 @@ class HeroWorld {
     let best = null, bd = Infinity;
     for (const e of this.enemies) {
       const c = this.enemyCenter(e);
-      if (segDist(c, a, end) < ENEMY[e.kind].r * s) { const d = dist(c, a); if (d < bd) { bd = d; best = e; } }
+      if (segDist(c, a, end) < this.enemyR(e)) { const d = dist(c, a); if (d < bd) { bd = d; best = e; } }
     }
     return best;
   }
@@ -1383,6 +1413,8 @@ class HeroWorld {
     if (e.hp <= 0) return;
     // no single blow does much to a giant: he falls to a long fight, not one smash
     if (ENEMY[e.kind].giant) dmg = Math.min(dmg, 4);
+    // the stones blaze around Thanos while he snaps: hits barely reach him
+    if (e.state === 'snap') dmg *= 0.25;
     // Doom's force field soaks most of it
     if (e.shield > 0) {
       dmg *= 0.15;
@@ -1403,14 +1435,14 @@ class HeroWorld {
     if (!silent) {
       const k = ENEMY[e.kind];
       this.counters.kills++;
-      const key = { drone: 'drones', mini: 'drones', walker: 'walkers', tank: 'tanks' }[e.kind] || 'bosses';
+      const key = { drone: 'drones', mini: 'drones', doombot: 'drones', walker: 'walkers', tank: 'tanks' }[e.kind] || 'bosses';
       this.counters[key] = (this.counters[key] || 0) + 1;
       if (k.boss) this.counters[e.kind] = (this.counters[e.kind] || 0) + 1; // thanos, doom, kang, galactus
-      if (e.beam) { this.beams = this.beams.filter((b) => b !== e.beam); e.beam = null; }
+      if (e.beam || e.drains) this.interruptEnemy(e);
       if (k.giant) {
         // the Devourer of Worlds falls
-        this.fx('galactusDown', e.x, e.y, { size: 1 });
-        this.fx('text', e.x + e.facing * 140 * this.s, e.y - 420 * this.s, { text: 'GALACTUS FALLS!', color: '#ffd166' });
+        this.fx('galactusDown', e.x, e.y, { size: e.k || 1 });
+        this.fx('text', e.x + e.facing * 190 * this.es(e), e.y - 560 * this.es(e), { text: 'GALACTUS FALLS!', color: '#ffd166' });
         this.sound('nukeBoom', c);
         for (const h of this.heroes) if (h.mode !== 'down' && h.mode !== 'thrown') h.say(h.line('victory'));
       } else {
@@ -1462,6 +1494,7 @@ class HeroWorld {
 
   tickEnemies(dt) {
     const s = this.s, D = this.diff;
+    this.tickStrikes(dt);
     for (const e of [...this.enemies]) {
       const k = ENEMY[e.kind];
       if (e.grabbed) {
@@ -1476,20 +1509,22 @@ class HeroWorld {
       e.cool -= dt * D.rate;
       e.phase += dt * (e.air ? 1 : Math.abs(e.vx) / (6 * s) + 0.01);
       const d = dist(this.enemyCenter(e), hc);
-      if (e.kind === 'drone') {
-        e.orbit += dt * 0.7;
+      if (e.kind === 'drone' || e.kind === 'doombot') {
+        // Ultron sentries and Doombots circle the hero and shoot from above
+        e.orbit += dt * (e.kind === 'doombot' ? 0.55 : 0.7);
         const want = { x: hc.x + Math.cos(e.orbit) * e.range * s, y: hc.y - e.alt * s + Math.sin(e.orbit * 1.7) * 30 * s };
         this.steerEnemy(e, want, k.speed * s, dt);
         e.facing = hc.x > e.x ? 1 : -1;
         e.charge = clamp(1 - e.cool / 0.6, 0, 1);
-        if (e.cool <= 0 && d < 750 * s && h.mode !== 'down') {
+        if (e.cool <= 0 && d < 780 * s && h.mode !== 'down') {
           e.cool = rand(k.fire[0], k.fire[1]);
-          this.enemyLaser(e, hc, 520 * s, k.dmg, null, h);
+          if (e.kind === 'doombot') this.enemyLaser(e, hc, 560 * s, k.dmg, null, h, 'glaser');
+          else { e.burst = 1; e.burstT = 0.12; this.enemyLaser(e, hc, 600 * s, k.dmg, null, h); } // a twin shot
         }
       } else if (e.kind === 'mini') {
-        this.steerEnemy(e, { x: hc.x, y: hc.y }, k.speed * s * (h.mode === 'down' ? 0.3 : 1), dt, 900 * s);
+        this.steerEnemy(e, { x: hc.x, y: hc.y }, k.speed * s * (h.mode === 'down' ? 0.3 : 1), dt, 950 * s);
         e.facing = e.vx > 0 ? 1 : -1;
-        if (d < 22 * s && h.mode !== 'down') { this.hurtHero(k.dmg, this.enemyCenter(e), h); this.kill(e); continue; }
+        if (d < 24 * s && h.mode !== 'down') { this.hurtHero(k.dmg, this.enemyCenter(e), h); this.kill(e); continue; }
       } else if (e.kind === 'doom') {
         this.tickDoom(e, dt, hc, h, d);
       } else {
@@ -1499,15 +1534,16 @@ class HeroWorld {
           e.vy += 1800 * s * dt; e.y += e.vy * dt;
           if (e.y >= g) {
             e.y = g; e.vy = 0; e.grounded = true;
-            this.fx('shockwave', e.x, e.y, { size: k.giant ? 4 : k.boss ? 1.6 : 0.7 });
-            this.sound(k.giant ? 'boomBig' : 'landing', e);
+            this.fx('shockwave', e.x, e.y, { size: k.giant ? 4 * (e.k || 1) : k.boss ? 2 : 0.8 });
+            this.sound(k.giant || k.boss ? 'boomBig' : 'landing', e);
+            if (k.giant) this.shakeFloor(1.4, 12);
           }
           continue;
         }
         e.y = g;
         const dx = hc.x - e.x;
         if (e.state !== 'firing' || !k.giant) e.facing = dx > 0 ? 1 : -1;
-        const want = (k.giant ? 0 : e.kind === 'thanos' ? 300 : e.kind === 'kang' ? 360 : e.kind === 'tank' ? 380 : 280) * s;
+        const want = (k.giant ? 0 : e.kind === 'thanos' ? 320 : e.kind === 'kang' ? 380 : e.kind === 'tank' ? 380 : 280) * s;
         let mv = 0;
         if (!k.giant && e.state === 'idle') {
           if (Math.abs(dx) > want + 40 * s) mv = Math.sign(dx);
@@ -1517,13 +1553,21 @@ class HeroWorld {
         const d0 = this.geo.displayAt({ x: e.x, y: e.y - 20 }) || this.geo.nearestDisplay(e);
         e.x = clamp(e.x + e.vx * dt, d0.work.x + 30 * s, d0.work.x + d0.work.width - 30 * s);
         if (e.kind === 'walker') {
+          // Ultron soldiers fire two quick palm blasts
+          const palm = { x: e.x + e.facing * 26 * s, y: e.y - 38 * s };
           e.charge = clamp(1 - e.cool / 0.5, 0, 1);
-          if (e.cool <= 0 && h.mode !== 'down') { e.cool = rand(k.fire[0], k.fire[1]); this.enemyLaser(e, hc, 460 * s, k.dmg, { x: e.x + e.facing * 18 * s, y: e.y - 24 * s }, h); }
+          if (e.cool <= 0 && h.mode !== 'down') { e.cool = rand(k.fire[0], k.fire[1]); e.burst = 1; e.burstT = 0.16; this.enemyLaser(e, hc, 500 * s, k.dmg, palm, h); }
         } else if (e.kind === 'tank') {
-          const muzzle = { x: e.x + e.facing * 24 * s, y: e.y - 24 * s };
+          // Ultron Prime: an arcing plasma shell, then a fan of three blasts
+          const muzzle = { x: e.x + e.facing * 34 * s, y: e.y - 46 * s };
           e.aim = -0.35;
           e.charge = clamp(1 - e.cool / 0.6, 0, 1);
-          if (e.cool <= 0 && h.mode !== 'down') { e.cool = rand(k.fire[0], k.fire[1]); this.enemyShell(e, muzzle, hc, k.dmg); }
+          if (e.cool <= 0 && h.mode !== 'down') {
+            e.cool = rand(k.fire[0], k.fire[1]);
+            e.volley = !e.volley;
+            if (e.volley) this.enemyShell(e, muzzle, hc, k.dmg);
+            else for (const da of [-0.12, 0, 0.12]) this.enemyLaser(e, { x: hc.x + Math.sin(da) * 200 * s, y: hc.y + da * 260 * s }, 540 * s, 4, muzzle, h);
+          }
         } else if (e.kind === 'thanos') {
           this.tickThanos(e, dt, hc, h);
         } else if (e.kind === 'kang') {
@@ -1532,7 +1576,17 @@ class HeroWorld {
           this.tickGalactus(e, dt, hc, h);
         }
       }
+      // the second shot of a quick burst
+      if (e.burst > 0 && this.enemies.includes(e)) {
+        e.burstT -= dt;
+        if (e.burstT <= 0) {
+          e.burst--;
+          if (h.mode !== 'down') this.enemyLaser(e, h.chest(), (e.kind === 'drone' ? 600 : 500) * s, k.dmg, e.kind === 'walker' ? { x: e.x + e.facing * 26 * s, y: e.y - 38 * s } : null, h);
+        }
+      }
     }
+    if (this.screenFlash && this.clock - this.screenFlash.at > this.screenFlash.dur * 1000) this.screenFlash = null;
+    if (this.quake && this.clock - this.quake.at > this.quake.dur * 1000) this.quake = null;
   }
 
   // ---- shared moves heroes use on enemies
@@ -1540,6 +1594,13 @@ class HeroWorld {
   stunEnemy(e, sec, kind) {
     if (!e || e.hp <= 0) return;
     const k = ENEMY[e.kind];
+    // a villain can't be pinned for long: webs and dazes don't stack past a moment, and once
+    // he breaks free he can't be pinned again straight away
+    if (k.boss) {
+      if (e.state === 'snap') return; // nothing stops the snap
+      if (!(e.stun > 0)) { if (this.clock < (e.stunFree || 0)) return; e.stunStart = this.clock; }
+      else if (this.clock - (e.stunStart || 0) > 1200) return;
+    }
     e.stun = Math.max(e.stun || 0, sec * (k.giant ? 0.15 : k.boss ? 0.35 : 1));
     e.stunKind = kind || 'daze';
     this.dirty();
@@ -1557,7 +1618,7 @@ class HeroWorld {
     } else { e.y = g; e.vy = 0; }
     e.vx *= Math.exp(-4 * dt);
     e.x = this.geo.clampWork({ x: e.x + e.vx * dt, y: e.y - 10 * s }, 20 * s).x;
-    if (e.stun <= 0) { e.stun = 0; e.stunKind = null; this.dirty(); }
+    if (e.stun <= 0) { e.stun = 0; e.stunKind = null; if (isBoss(e)) e.stunFree = this.clock + 3500; this.dirty(); }
   }
 
   // launch: knocked flying (a punch, a smash). o.thrown = { dmg, r } makes it a projectile that
@@ -1565,7 +1626,7 @@ class HeroWorld {
   launchEnemy(e, vx, vy, o) {
     if (!e || e.hp <= 0) return;
     o = o || {};
-    if (ENEMY[e.kind].giant) { if (o.dmg) this.damage(e, o.dmg, e); return; } // nobody knocks Galactus over
+    if (ENEMY[e.kind].giant || e.state === 'snap') { if (o.dmg) this.damage(e, o.dmg, e); return; } // nobody knocks Galactus over (or stops the snap)
     const heavy = isBoss(e) && !o.thrown ? 0.3 : 1;
     e.grabbed = null;
     e.launch = { t: 0, spinV: o.spin != null ? o.spin : (vx >= 0 ? 1 : -1) * rand(6, 12) * heavy, thrown: o.thrown || null, dmg: o.dmg || 0 };
@@ -1587,7 +1648,7 @@ class HeroWorld {
     if (d && e.y < d.work.y + 20 * s) { e.y = d.work.y + 20 * s; e.vy = Math.abs(e.vy) * 0.3; }
     if (L.thrown) {
       const me = this.enemyCenter(e);
-      const hit = this.enemies.find((o) => o !== e && !o.launch && !o.grabbed && dist(this.enemyCenter(o), me) < (ENEMY[o.kind].r + ENEMY[e.kind].r) * s);
+      const hit = this.enemies.find((o) => o !== e && !o.launch && !o.grabbed && dist(this.enemyCenter(o), me) < this.enemyR(o) + this.enemyR(e));
       if (hit) { this.crash(e); return; }
     }
     const g = this.groundAt(e.x, e.y);
@@ -1620,7 +1681,7 @@ class HeroWorld {
     let n = 0;
     for (const o of [...this.enemies]) {
       if (o === except) continue;
-      if (dist(this.enemyCenter(o), p) < r + ENEMY[o.kind].r * this.s) { this.damage(o, dmg, p); n++; }
+      if (dist(this.enemyCenter(o), p) < r + this.enemyR(o)) { this.damage(o, dmg, p); n++; }
     }
     return n;
   }
@@ -1636,7 +1697,8 @@ class HeroWorld {
   // whatever it was doing (charging, firing a beam, winding up) is cut short
   interruptEnemy(e) {
     if (e.beam) { this.beams = this.beams.filter((b) => b !== e.beam); e.beam = null; }
-    e.state = 'idle'; e.charge = 0;
+    if (e.drains) { const gone = new Set(e.drains.map((d) => d.beam)); this.beams = this.beams.filter((b) => !gone.has(b)); e.drains = null; }
+    e.state = 'idle'; e.charge = 0; e.jumped = false; e.meteorT = 0;
   }
 
   count(key, n) { this.counters[key] = (this.counters[key] || 0) + (n == null ? 1 : n); }
@@ -1653,13 +1715,13 @@ class HeroWorld {
     e.x = q.x; e.y = Math.min(q.y, this.groundAt(q.x, q.y) - 20 * this.s);
   }
 
-  enemyLaser(e, target, speed, dmg, from, who) {
+  enemyLaser(e, target, speed, dmg, from, who, kind) {
     const s = this.s;
     const o = from || this.enemyCenter(e);
     const hv = who || this.hero;
     const lead = { x: target.x + hv.vx * 0.25, y: target.y + hv.vy * 0.25 };
     const a = Math.atan2(lead.y - o.y, lead.x - o.x) + rand(-0.06, 0.06);
-    this.addShot({ kind: 'laser', owner: 'enemy', x: o.x, y: o.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg, life: 3 });
+    this.addShot({ kind: kind || 'laser', owner: 'enemy', x: o.x, y: o.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg, life: 3, bolt: true });
     this.sound('laser', o);
     void s;
   }
@@ -1731,140 +1793,348 @@ class HeroWorld {
 
   heroOnFloor(h) { return h.y > this.groundAt(h.x, h.y) - 40 * h.s; }
 
-  // ---- Thanos: the gauntlet beam, a ground slam up close, and a hurled rock
+  // the whole screen flashes (the snap) / the floor shakes (a giant's stomp)
+  flashScreen(dur, color) { this.screenFlash = { at: this.clock, dur, color: color || '255,255,255' }; this.dirty(); }
+  shakeFloor(dur, px) { this.quake = { at: this.clock, dur, px }; this.dirty(); }
+
+  // Doom's lightning storm: each bolt is marked on the floor, then strikes from the sky
+  tickStrikes(dt) {
+    if (!this.strikes.length) return;
+    const s = this.s;
+    for (const st of [...this.strikes]) {
+      if (this.clock < st.at) continue;
+      this.strikes.splice(this.strikes.indexOf(st), 1);
+      const d = this.geo.displayAt({ x: st.x, y: st.y - 20 }) || this.geo.nearestDisplay(st);
+      const top = { x: st.x + rand(-40, 40) * s, y: d.work.y - 10 };
+      const b = this.addBeam('lightning', top, { x: st.x, y: st.y }, 0.35, 6, 'enemy');
+      b.color = '90,255,140'; b.core = 'rgba(230,255,235,0.95)'; b.strike = true;
+      this.fx('flash', st.x, st.y - 10 * s, { size: 2, color: '120,255,160' });
+      this.fx('shockwave', st.x, st.y, { size: 1 });
+      this.sound('lightning', st);
+      for (const hh of this.heroes) {
+        const c = hh.chest();
+        if (hh.mode !== 'down' && Math.abs(c.x - st.x) < 38 * s) this.hurtHero(st.dmg, c, hh);
+      }
+    }
+    void dt;
+  }
+
+  // ---- Thanos: the gauntlet beam, a power-stone blast, a space-stone portal jump, a ground
+  // slam up close, a hurled rock — and, once, when he's losing: the SNAP
   tickThanos(e, dt, hc, who) {
     const s = this.s, h = who || this.hero, k = ENEMY.thanos;
-    const fist = { x: e.x + e.facing * 30 * s, y: e.y - 128 * s }; // the raised gauntlet
+    const fist = { x: e.x + e.facing * 44 * s, y: e.y - 186 * s }; // the gauntlet raised
+    const punch = { x: e.x + e.facing * 52 * s, y: e.y - 140 * s }; // thrust forward
+    if (!e.snapped && e.hp < e.maxHp * 0.4 && h.mode !== 'down') {
+      // whatever he was doing, the gauntlet goes up
+      this.interruptEnemy(e);
+      e.snapped = true; e.state = 'snap'; e.stateT = 0;
+      this.sound('gauntlet', e);
+      this.say(this.hero.line('snapWarn'), 'warn');
+    }
     if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down') {
-      if (Math.abs(hc.x - e.x) < 230 * s && this.heroOnFloor(h)) { e.state = 'slam'; e.stateT = 0; this.sound('chargeLong', e); }
-      else if (chance(0.5)) { e.state = 'charging'; e.stateT = 0; this.sound('gauntlet', e); this.say(this.hero.line('bossBeam'), 'warn'); }
+      const adx = Math.abs(hc.x - e.x), r = Math.random();
+      if (adx < 260 * s && this.heroOnFloor(h)) { e.state = 'slam'; e.stateT = 0; this.sound('chargeLong', e); }
+      else if (adx > 480 * s && this.clock >= e.portalAt && r < 0.45) { e.state = 'portal'; e.stateT = 0; e.portalAt = this.clock + rand(9000, 13000); this.fx('spaceportal', e.x, e.y - 100 * s, { size: 2.6 }); this.sound('timeWarp', e); }
+      else if (r < 0.4) { e.state = 'power'; e.stateT = 0; this.sound('chargeLong', e); }
+      else if (r < 0.75) { e.state = 'charging'; e.stateT = 0; this.sound('gauntlet', e); this.say(this.hero.line('bossBeam'), 'warn'); }
       else { e.state = 'throw'; e.stateT = 0; }
     }
     if (e.state === 'slam') {
       e.stateT += dt;
       e.charge = clamp(e.stateT / 0.6, 0, 1);
       if (e.stateT >= 0.6) {
-        const g = { x: e.x + e.facing * 40 * s, y: e.y };
-        this.fx('shockwave', g.x, g.y, { size: 2.4 });
+        const g = { x: e.x + e.facing * 50 * s, y: e.y };
+        this.fx('shockwave', g.x, g.y, { size: 3 });
+        this.fx('flash', g.x, g.y - 20 * s, { size: 1.6, color: '200,120,255' });
         this.sound('boomBig', g);
-        for (const hh of this.heroes) if (hh.mode !== 'down' && Math.abs(hh.x - g.x) < 280 * s && this.heroOnFloor(hh)) this.hurtHero(k.dmg, { x: hh.x, y: hh.y - 20 * s }, hh);
-        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(2.2, 3);
+        this.shakeFloor(0.5, 5);
+        for (const hh of this.heroes) if (hh.mode !== 'down' && Math.abs(hh.x - g.x) < 300 * s && this.heroOnFloor(hh)) this.hurtHero(k.dmg, { x: hh.x, y: hh.y - 20 * s }, hh);
+        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(2.0, 2.8);
       }
     } else if (e.state === 'throw') {
       e.stateT += dt;
       e.charge = clamp(e.stateT / 0.55, 0, 1);
       if (e.stateT >= 0.55) {
-        this.enemyLob(e, 'rock', { x: e.x - e.facing * 6 * s, y: e.y - 140 * s }, hc, 10, 1.4);
-        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(2.4, 3.2);
+        this.enemyLob(e, 'rock', { x: e.x - e.facing * 9 * s, y: e.y - 203 * s }, hc, 12, 1.8);
+        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(2.2, 3.0);
+      }
+    } else if (e.state === 'power') {
+      // the Power Stone: a crackling purple sphere that bursts on whatever it hits
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.75, 0, 1);
+      if (e.stateT >= 0.75) {
+        this.enemyBolt(e, 'powerorb', punch, hc, 380 * s, 10, h, { size: 1.7, hr: 44, hitFx: 'powerburst', hitSize: 1.6, hitSound: 'boomBig', life: 4 });
+        this.sound('gauntlet', punch);
+        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]);
+      }
+    } else if (e.state === 'portal') {
+      // the Space Stone: he steps through a blue portal and comes out right beside the hero
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.5, 0, 1);
+      if (e.stateT >= 0.5 && !e.jumped) {
+        e.jumped = true;
+        const d0 = this.geo.displayAt({ x: h.x, y: h.y - 20 * s }) || this.geo.nearestDisplay(h);
+        const side = h.x < d0.work.x + d0.work.width / 2 ? 1 : -1;
+        e.x = clamp(h.x + side * rand(150, 200) * s, d0.work.x + 60 * s, d0.work.x + d0.work.width - 60 * s);
+        e.y = this.groundAt(e.x, d0.work.y + d0.work.height - 5);
+        e.facing = h.x > e.x ? 1 : -1;
+        e.warpT = now();
+        this.fx('spaceportal', e.x, e.y - 100 * s, { size: 2.6 });
+        this.sound('timeWarp', e);
+        this.dirty();
+      }
+      if (e.stateT >= 0.85) {
+        e.jumped = false;
+        if (this.heroOnFloor(h)) { e.state = 'slam'; e.stateT = 0.2; this.sound('chargeLong', e); }
+        else { e.state = 'power'; e.stateT = 0.3; }
+      }
+    } else if (e.state === 'snap') {
+      // the gauntlet goes up, every stone blazes… SNAP
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 1.8, 0, 1);
+      if (e.stateT >= 1.8) {
+        this.flashScreen(1.6, '255,255,255');
+        this.sound('snap', e);
+        for (const hh of this.heroes) {
+          if (hh.mode === 'down') continue;
+          hh.setHealth(Math.max(1, hh.armor * 0.5));
+          hh.hitAt = now();
+        }
+        // some of the allies turn to dust
+        for (const a of [...this.allies]) {
+          if (!chance(0.5)) continue;
+          this.fx('dust', a.x, a.y - 50 * a.s, { size: a.s, color: (this.H.ALLIES && this.H.ALLIES.dust) || '150,120,100' });
+          this.removeAlly(a);
+          if (this.army) this.army.legionAt = Math.max(this.army.legionAt, this.clock + 6000);
+        }
+        this.say(this.hero.line('snapped'), 'warn');
+        e.state = 'recover'; e.stateT = -0.8; e.charge = 0; e.cool = rand(2.5, 3.2);
       }
     } else if (e.state === 'charging' || e.state === 'firing') {
-      this.bossBeam(e, dt, hc, fist, { charge: 1.2, fire: 1.4, w: 10, dmg: 2.4, turn: 0.55, kind: 'gauntlet', color: '190,90,255', core: 'rgba(255,240,255,0.95)', after: [k.fire[0], k.fire[1]] });
+      this.bossBeam(e, dt, hc, fist, { charge: 1.1, fire: 1.5, w: 12, dmg: 2.8, turn: 0.6, kind: 'gauntlet', color: '190,90,255', core: 'rgba(255,240,255,0.95)', after: [k.fire[0], k.fire[1]] });
     } else if (e.state === 'recover') {
       e.stateT += dt;
       if (e.stateT > 0.45) e.state = 'idle';
     }
   }
 
-  // ---- Doctor Doom: hovers at a distance; homing mystic bolts, a lightning beam, a force field
+  // ---- Doctor Doom: hovers at a distance; homing mystic bolts, a lightning beam, a lightning
+  // storm from the sky, Doombots summoned to his side, and a force field
   tickDoom(e, dt, hc, h, d) {
     const s = this.s, k = ENEMY.doom;
     const side = e.x < hc.x ? -1 : 1;
     const want = { x: hc.x + side * e.range * s, y: hc.y - e.alt * s + Math.sin(e.phase * 1.3) * 18 * s };
-    if (e.state !== 'firing') this.steerEnemy(e, want, k.speed * s, dt, 420 * s);
+    if (e.state !== 'firing' && e.state !== 'storm') this.steerEnemy(e, want, k.speed * s, dt, 420 * s);
     else { e.vx *= 0.9; e.vy *= 0.9; }
     e.facing = hc.x > e.x ? 1 : -1;
     if (e.shield > 0) e.shield = Math.max(0, e.shield - dt);
-    else if (this.clock >= e.shieldAt) { e.shield = 2.6; e.shieldAt = this.clock + rand(9000, 12000); this.sound('shield', e); this.dirty(); }
-    const hands = { x: e.x + e.facing * 27 * s, y: e.y - 3 * s };
-    if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down' && d < 950 * s) {
-      if (chance(0.55)) {
+    else if (this.clock >= e.shieldAt) { e.shield = 3; e.shieldAt = this.clock + rand(9000, 12000); this.sound('shield', e); this.dirty(); }
+    const hands = { x: e.x + e.facing * 43 * s, y: e.y - 4 * s };
+    if (e.state === 'idle' && h.mode !== 'down' && this.clock >= e.botAt && this.enemies.length < 24 && this.enemies.filter((x) => x.kind === 'doombot').length < 2) {
+      e.state = 'summon'; e.stateT = 0; this.sound('mystic', e);
+    } else if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down' && d < 1000 * s) {
+      const r = Math.random();
+      if (r < 0.4) {
         for (let i = 0; i < 3; i++) {
-          this.addShot({ kind: 'mystic', owner: 'enemy', x: hands.x, y: hands.y, vx: e.facing * 140 * s + (i - 1) * 30 * s, vy: (i - 1) * 130 * s - 40 * s, homing: true, turn: 2.2, vmax: 300, dmg: k.dmg, life: 4.5, speed: 150 * s, hitFx: 'flash', hitColor: '90,255,140', hitSize: 0.8, hitSound: 'hit' });
+          this.addShot({ kind: 'mystic', owner: 'enemy', x: hands.x, y: hands.y, vx: e.facing * 140 * s + (i - 1) * 30 * s, vy: (i - 1) * 130 * s - 40 * s, homing: true, turn: 2.2, vmax: 310, dmg: k.dmg, life: 4.5, speed: 150 * s, hitFx: 'flash', hitColor: '90,255,140', hitSize: 0.9, hitSound: 'hit' });
         }
         this.sound('mystic', e);
-        e.cool = rand(k.fire[0], k.fire[1]) + 0.8;
-      } else { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); }
+        e.cool = rand(k.fire[0], k.fire[1]) + 0.6;
+      } else if (r < 0.7) { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); }
+      else { e.state = 'storm'; e.stateT = 0; this.sound('lightning', e); }
     }
-    if (e.state === 'charging' || e.state === 'firing') {
-      this.bossBeam(e, dt, hc, hands, { charge: 0.7, fire: 1.0, w: 7, dmg: 2, turn: 1.1, kind: 'lightning', color: '90,255,140', core: 'rgba(230,255,235,0.95)', sound: 'lightning', after: [k.fire[0], k.fire[1]] });
+    if (e.state === 'summon') {
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.8, 0, 1);
+      if (e.stateT >= 0.8) {
+        for (const sd of [-1, 1]) {
+          const p = { x: e.x + sd * rand(90, 140) * s, y: e.y + rand(-50, 30) * s };
+          this.fx('doomport', p.x, p.y, { size: 1.4 });
+          this.spawn('doombot', p, { max: 40, silent: true });
+        }
+        this.sound('spawn', e);
+        e.botAt = this.clock + rand(16000, 22000);
+        e.state = 'idle'; e.charge = 0; e.cool = Math.max(e.cool, 1);
+      }
+    } else if (e.state === 'storm') {
+      // arms raised: five bolts walk across the hero's spot
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.6, 0, 1);
+      if (e.stateT >= 0.6) {
+        const g = this.groundAt(h.x, h.y);
+        const xs = [-2, -1, 0, 1, 2].map((i) => h.x + i * 85 * s + rand(-20, 20) * s);
+        if (chance(0.5)) xs.reverse();
+        xs.forEach((x, i) => {
+          this.strikes.push({ x, y: g, at: this.clock + 700 + i * 200, dmg: k.dmg + 2 });
+          this.fx('stormMark', x, g, { size: 1, life: 0.7 + i * 0.2 });
+        });
+        e.state = 'idle'; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]) + 1.2;
+      }
+    } else if (e.state === 'charging' || e.state === 'firing') {
+      this.bossBeam(e, dt, hc, hands, { charge: 0.7, fire: 1.1, w: 8, dmg: 2.2, turn: 1.1, kind: 'lightning', color: '90,255,140', core: 'rgba(230,255,235,0.95)', sound: 'lightning', after: [k.fire[0], k.fire[1]] });
     }
   }
 
-  // ---- Kang the Conqueror: steps through time portals, chrono-bolt bursts, a heavy time blast
+  // ---- Kang the Conqueror: steps through time portals, freezes a hero in time, calls a squad
+  // out of another century, chrono-bolt bursts and a heavy time blast
   tickKang(e, dt, hc, who) {
     const s = this.s, h = who || this.hero, k = ENEMY.kang;
-    const cannon = { x: e.x + e.facing * 36 * s, y: e.y - 64 * s };
-    const close = Math.abs(hc.x - e.x) < 160 * s;
+    const cannon = { x: e.x + e.facing * 55 * s, y: e.y - 97 * s };
+    const close = Math.abs(hc.x - e.x) < 170 * s;
     if (e.state === 'idle' && h.mode !== 'down' && (this.clock >= e.warpAt || (close && this.clock >= e.warpAt - 4500))) {
       const d0 = this.geo.displayAt({ x: h.x, y: h.y - 20 * s }) || this.geo.nearestDisplay(h);
-      const lo = d0.work.x + 50 * s, hi = d0.work.x + d0.work.width - 50 * s;
+      const lo = d0.work.x + 60 * s, hi = d0.work.x + d0.work.width - 60 * s;
       let side = chance(0.5) ? 1 : -1;
-      let nx = clamp(h.x + side * rand(260, 460) * s, lo, hi);
-      if (Math.abs(nx - h.x) < 200 * s) { side = -side; nx = clamp(h.x + side * rand(260, 460) * s, lo, hi); }
-      this.fx('timeportal', e.x, e.y - 50 * s, { size: 2.2 });
+      let nx = clamp(h.x + side * rand(280, 480) * s, lo, hi);
+      if (Math.abs(nx - h.x) < 220 * s) { side = -side; nx = clamp(h.x + side * rand(280, 480) * s, lo, hi); }
+      this.fx('timeportal', e.x, e.y - 76 * s, { size: 3 });
       e.x = nx; e.y = this.groundAt(nx, d0.work.y + d0.work.height - 5);
-      this.fx('timeportal', e.x, e.y - 50 * s, { size: 2.2 });
+      this.fx('timeportal', e.x, e.y - 76 * s, { size: 3 });
       this.sound('timeWarp', e);
       e.warpAt = this.clock + rand(6500, 9500);
       e.warpT = now();
       e.cool = Math.max(e.cool, 0.6);
       this.dirty();
     }
-    if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down') {
-      if (chance(0.7)) { e.state = 'burst'; e.stateT = 0; e.shotsLeft = 3; }
+    const canFreeze = (h.mode === 'ground' || h.mode === 'air') && !(h.frozen > 0) && dist(hc, cannon) < 800 * s;
+    if (e.state === 'idle' && h.mode !== 'down' && this.clock >= e.freezeAt && canFreeze) {
+      e.state = 'freeze'; e.stateT = 0; this.sound('timeWarp', e);
+    } else if (e.state === 'idle' && h.mode !== 'down' && this.clock >= e.squadAt && this.enemies.length < 16) {
+      e.state = 'squad'; e.stateT = 0; this.sound('timeWarp', e);
+    } else if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down') {
+      if (chance(0.65)) { e.state = 'burst'; e.stateT = 0; e.shotsLeft = 3; }
       else { e.state = 'charging'; e.stateT = 0; this.sound('chargeLong', e); }
     }
-    if (e.state === 'burst') {
+    if (e.state === 'freeze') {
+      // the stasis field: the hero is stuck in time for a moment, then a burst hits him
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.7, 0, 1);
+      if (e.stateT >= 0.7) {
+        if ((h.mode === 'ground' || h.mode === 'air') && h.taskName !== 'reboot') {
+          h.frozen = 1.8;
+          const c = h.chest();
+          this.fx('timefreeze', c.x, c.y, { size: h.s, life: 1.8 });
+          this.sound('timeStop', c);
+          h.say(h.line('frozen'), 'warn');
+        }
+        e.freezeAt = this.clock + rand(10000, 14000);
+        e.state = 'burst'; e.stateT = 0; e.shotsLeft = 5;
+      }
+    } else if (e.state === 'squad') {
+      // time portals open on both sides and drop a squad from another century
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.9, 0, 1);
+      if (e.stateT >= 0.9) {
+        const d0 = this.geo.displayAt({ x: h.x, y: h.y - 20 * s }) || this.geo.nearestDisplay(h);
+        for (const sd of [-1, 1]) {
+          const x = clamp(h.x + sd * rand(300, 420) * s, d0.work.x + 50 * s, d0.work.x + d0.work.width - 50 * s);
+          const y = this.groundAt(x, d0.work.y + d0.work.height - 5);
+          this.fx('timeportal', x, y - 60 * s, { size: 2.4 });
+          this.spawn('walker', { x, y: y - 40 * s }, { max: 40, silent: true });
+          if (chance(0.5)) this.spawn('drone', { x, y: y - 180 * s }, { max: 40, silent: true });
+        }
+        this.sound('timeWarp', e);
+        e.squadAt = this.clock + rand(18000, 24000);
+        e.state = 'idle'; e.charge = 0; e.cool = Math.max(e.cool, 1);
+      }
+    } else if (e.state === 'burst') {
       e.stateT += dt;
       e.charge = 0.6;
-      if (e.stateT >= 0.16) {
+      if (e.stateT >= 0.15) {
         e.stateT = 0;
-        this.enemyBolt(e, 'chrono', cannon, hc, 620 * s, k.dmg, h, { hitFx: 'flash', hitColor: '80,240,255', hitSize: 0.6, hitSound: 'hit' });
+        this.enemyBolt(e, 'chrono', cannon, hc, 640 * s, k.dmg, h, { hitFx: 'flash', hitColor: '80,240,255', hitSize: 0.7, hitSound: 'hit' });
         if (--e.shotsLeft <= 0) { e.state = 'idle'; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]); }
       }
     } else if (e.state === 'charging') {
       e.stateT += dt;
       e.charge = clamp(e.stateT / 0.9, 0, 1);
       if (e.stateT >= 0.9) {
-        this.enemyBolt(e, 'timeblast', cannon, hc, 300 * s, 11, h, { size: 1.8, hitFx: 'explosion', hitSize: 0.9 });
+        this.enemyBolt(e, 'timeblast', cannon, hc, 320 * s, 13, h, { size: 2.2, hr: 36, hitFx: 'explosion', hitSize: 1.1 });
         e.state = 'idle'; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]) + 0.6;
       }
     }
   }
 
-  // ---- Galactus: towers at the side of the screen; Power Cosmic eye beams that sweep the
-  // screen, cosmic orbs from his hands, and a stomp that shakes the floor
+  // ---- Galactus: towers over the screen; a Power Cosmic eye beam that sweeps the screen,
+  // a drain that pulls the heroes' power out of them, a meteor shower, homing cosmic orbs and
+  // an earthquake stomp
   tickGalactus(e, dt, hc, who) {
-    const s = this.s, h = who || this.hero, k = ENEMY.galactus;
-    const eyes = { x: e.x + e.facing * 16 * s, y: e.y - 528 * s };
-    const hand = { x: e.x + e.facing * 128 * s, y: e.y - 300 * s };
+    const s = this.s, K = this.es(e), h = who || this.hero, k = ENEMY.galactus;
+    const eyes = { x: e.x + e.facing * 23 * K, y: e.y - 748 * K };
+    const hand = { x: e.x + e.facing * 181 * K, y: e.y - 425 * K };
+    const palms = { x: e.x + e.facing * 205 * K, y: e.y - 527 * K };
     if (e.state === 'idle' && e.cool <= 0 && h.mode !== 'down') {
       const r = Math.random();
-      if (r < 0.25 && this.heroOnFloor(h) && Math.abs(h.x - e.x) < 750 * s) { e.state = 'stomp'; e.stateT = 0; this.sound('chargeLong', e); }
-      else if (r < 0.65) { e.state = 'charging'; e.stateT = 0; this.sound('cosmicHum', e); this.say(this.hero.line('bossBeam'), 'warn'); }
+      if (r < 0.2 && this.heroOnFloor(h) && Math.abs(h.x - e.x) < 1000 * s) { e.state = 'stomp'; e.stateT = 0; this.sound('chargeLong', e); }
+      else if (r < 0.45) { e.state = 'charging'; e.stateT = 0; this.sound('cosmicHum', e); this.say(this.hero.line('bossBeam'), 'warn'); }
+      else if (r < 0.62 && this.clock >= e.drainAt) { e.state = 'drain'; e.stateT = 0; this.sound('cosmicHum', e); }
+      else if (r < 0.82) { e.state = 'meteors'; e.stateT = 0; e.shotsLeft = 8; this.sound('chargeLong', e); this.say(this.hero.line('meteors'), 'warn'); }
       else { e.state = 'orbs'; e.stateT = 0; e.shotsLeft = 4; }
     }
     if (e.state === 'stomp') {
       e.stateT += dt;
       e.charge = clamp(e.stateT / 1.0, 0, 1);
       if (e.stateT >= 1.0) {
-        const g = { x: e.x + e.facing * 60 * s, y: e.y };
-        this.fx('shockwave', g.x, g.y, { size: 5 });
+        const g = { x: e.x + e.facing * 80 * K, y: e.y };
+        this.fx('shockwave', g.x, g.y, { size: 6 });
+        this.fx('quake', g.x, g.y, { size: 1 });
         this.sound('boomBig', g);
-        for (const hh of this.heroes) if (hh.mode !== 'down' && this.heroOnFloor(hh) && Math.abs(hh.x - g.x) < 750 * s) this.hurtHero(8, { x: hh.x, y: hh.y - 20 * s }, hh);
+        this.sound('quake', g);
+        this.shakeFloor(1.3, 14);
+        for (const hh of this.heroes) if (hh.mode !== 'down' && this.heroOnFloor(hh) && Math.abs(hh.x - g.x) < 1000 * s) this.hurtHero(9, { x: hh.x, y: hh.y - 20 * s }, hh);
         e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]);
+      }
+    } else if (e.state === 'drain') {
+      // purple tendrils from his hands to every hero: power (heat, stamina, web fluid…) flows out
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.6, 0, 1);
+      if (e.stateT >= 0.6) {
+        if (!e.drains) {
+          e.drains = this.heroes.filter((hh) => hh.mode !== 'down').map((hh) => ({ id: hh.id, beam: this.addBeam('drain', palms, hh.chest(), 2.3, 7, 'enemy') }));
+          this.sound('drain', e);
+          this.say(this.hero.line('drained'), 'warn');
+        }
+        e.drainTick = (e.drainTick || 0) + dt;
+        const tickNow = e.drainTick > 0.25;
+        if (tickNow) e.drainTick = 0;
+        for (const dr of e.drains) {
+          const hh = this.heroes.find((x) => x.id === dr.id);
+          if (!hh || hh.mode === 'down') { dr.beam.dur = 0; continue; }
+          const c = hh.chest();
+          dr.beam.x1 = palms.x; dr.beam.y1 = palms.y; dr.beam.x2 = c.x; dr.beam.y2 = c.y;
+          if (tickNow) { hh.power = Math.max(0, hh.power - 1.4); this.hurtHero(0.7, c, hh); }
+        }
+      }
+      if (e.stateT >= 2.8) {
+        for (const dr of e.drains || []) this.beams = this.beams.filter((b) => b !== dr.beam);
+        e.drains = null;
+        e.drainAt = this.clock + rand(12000, 16000);
+        e.state = 'recover'; e.stateT = 0; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]);
+      }
+    } else if (e.state === 'meteors') {
+      // an arm raised to the sky: burning rocks rain down around the heroes
+      e.stateT += dt;
+      e.charge = clamp(e.stateT / 0.7, 0, 1);
+      if (e.stateT >= 0.7 && (e.meteorT = (e.meteorT || 0) - dt) <= 0) {
+        e.meteorT = 0.2;
+        const d0 = this.geo.displayAt({ x: h.x, y: h.y - 20 * s }) || this.geo.nearestDisplay(h);
+        const x = clamp(h.x + rand(-300, 300) * s, d0.work.x + 20, d0.work.x + d0.work.width - 20);
+        const sz = rand(1.1, 1.8);
+        this.addShot({ kind: 'meteor', owner: 'enemy', x: x - e.facing * rand(60, 160) * s, y: d0.work.y - 30, vx: e.facing * rand(60, 150) * s, vy: rand(260, 360) * s, g: 700 * s, dmg: 8, life: 5, size: sz, hr: 30 + 10 * sz, hitFx: 'explosion', hitSize: 0.8 * sz, hitSound: 'boomBig' });
+        if (--e.shotsLeft <= 0) { e.state = 'recover'; e.stateT = 0; e.charge = 0; e.meteorT = 0; e.cool = rand(k.fire[0], k.fire[1]); }
       }
     } else if (e.state === 'orbs') {
       e.stateT += dt;
       e.charge = 0.7;
       if (e.stateT >= 0.35) {
         e.stateT = 0;
-        this.addShot({ kind: 'cosmic', owner: 'enemy', x: hand.x, y: hand.y, vx: e.facing * rand(80, 200) * s, vy: rand(-160, 40) * s, homing: true, turn: 1.6, vmax: 240, dmg: 7, life: 6, speed: 120 * s, size: 2, hitSize: 1 });
+        this.addShot({ kind: 'cosmic', owner: 'enemy', x: hand.x, y: hand.y, vx: e.facing * rand(80, 200) * s, vy: rand(-160, 40) * s, homing: true, turn: 1.6, vmax: 250, dmg: 8, life: 6, speed: 120 * s, size: 2.2, hitSize: 1.1 });
         this.sound('mystic', hand);
         if (--e.shotsLeft <= 0) { e.state = 'idle'; e.charge = 0; e.cool = rand(k.fire[0], k.fire[1]); }
       }
     } else if (e.state === 'charging' || e.state === 'firing') {
-      this.bossBeam(e, dt, hc, eyes, { charge: 1.5, fire: 2.4, w: 16, dmg: 3, sweep: 0.6, hit: 34, len: 2800, kind: 'cosmic', color: '200,170,255', core: 'rgba(255,250,255,0.98)', after: [k.fire[0], k.fire[1]] });
+      this.bossBeam(e, dt, hc, eyes, { charge: 1.5, fire: 2.6, w: 18, dmg: 3.2, sweep: 0.65, hit: 36, len: 3200, kind: 'cosmic', color: '200,170,255', core: 'rgba(255,250,255,0.98)', after: [k.fire[0], k.fire[1]] });
     } else if (e.state === 'recover') {
       e.stateT += dt;
       if (e.stateT > 0.6) e.state = 'idle';
@@ -1904,7 +2174,7 @@ class HeroWorld {
         for (const e of [...this.enemies]) {
           if (p.hit && p.hit[e.id]) continue;
           const c = this.enemyCenter(e);
-          if (dist(c, p) < (ENEMY[e.kind].r + (p.r || 5)) * s) {
+          if (dist(c, p) < this.enemyR(e) + (p.r || 5) * s) {
             this.damage(e, p.dmg, p);
             if (p.stun) this.stunEnemy(e, p.stun, p.stunKind);
             if (p.knock && e.hp > 0) this.launchEnemy(e, Math.sign(p.vx || 1) * p.knock * s, -p.knock * 0.45 * s);
@@ -1919,19 +2189,20 @@ class HeroWorld {
         if (!dead && p.tp && dist(p, p.tp) < 14 * s) { this.fx(p.hitFx || 'explosion', p.x, p.y, { size: 0.7 }); this.sound(p.hitSound || 'boom', p); if (p.splash) this.splash(p, p.splash * s, p.splashDmg || p.dmg); dead = true; }
       } else {
         for (const h of heroes) {
-          if (h.mode === 'down' || dist(p, h.chest()) >= 26 * h.s) continue;
+          if (h.mode === 'down' || dist(p, h.chest()) >= (p.hr || 26) * h.s) continue;
           this.hurtHero(p.dmg, p, h);
-          if (p.kind !== 'laser') { this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.6, color: p.hitColor }); this.sound(p.hitSound || 'boom', p); }
+          if (p.kind !== 'laser' && p.kind !== 'glaser') { this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.6, color: p.hitColor }); this.sound(p.hitSound || 'boom', p); }
           dead = true;
           break;
         }
       }
       // (lasers and bolts fly on past the floor; everything else lands)
       if (!dead && p.y >= this.groundAt(p.x, p.y) && p.kind !== 'laser' && !p.bolt) {
+        if (p.kind === 'meteor') this.fx('crater', p.x, p.y, { size: p.size || 1 });
         this.fx(p.hitFx || 'explosion', p.x, p.y, { size: p.hitSize || 0.6, color: p.hitColor });
         this.sound(p.hitSound || 'boom', p);
         if (p.owner === 'enemy') {
-          for (const h of heroes) if (dist(p, { x: h.x, y: h.y - 30 * s }) < 50 * s) this.hurtHero(p.dmg * 0.5, p, h);
+          for (const h of heroes) if (dist(p, { x: h.x, y: h.y - 30 * s }) < (p.hr ? p.hr * 1.6 : 50) * s) this.hurtHero(p.dmg * 0.5, p, h);
         } else if (p.splash) this.splash(p, p.splash * s, p.splashDmg || p.dmg);
         dead = true;
       }
@@ -2122,7 +2393,7 @@ class HeroWorld {
         if (e) {
           if (side !== 'top' && !e.air && !ENEMY[kind].giant) e.vx = (side === 'left' ? 1 : -1) * 40 * s;
           if (side !== 'top' && e.air) e.vx = (side === 'left' ? 1 : -1) * 260 * s;
-          if (a.huge && !boss) { e.hp *= 0.7; e.maxHp = e.hp; }
+          if (a.huge && !boss) { e.hp *= 0.6; e.maxHp = e.hp; } // a huge battle is about numbers: lighter grunts
           if (i === 0 && !boss) this.fx('portal', e.x, this.enemyCenter(e).y, {});
           if (boss && a.huge) this.hero.say(this.hero.line('armyBoss'), 'warn');
         }
@@ -2238,7 +2509,7 @@ class HeroWorld {
     const s = this.s;
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
-      if (dist(this.enemyCenter(e), p) < (ENEMY[e.kind].r + 6) * s) return e;
+      if (dist(this.enemyCenter(e), p) < this.enemyR(e) + 6 * s) return e;
     }
     return null;
   }
@@ -2306,11 +2577,11 @@ class HeroWorld {
       }
       case 'clearEnemies':
         for (const e of [...this.enemies]) this.kill(e, true);
-        this.shots = []; this.beams = [];
+        this.shots = []; this.beams = []; this.strikes = [];
         break;
       case 'quiet':
         this.quiet = a.value != null ? !!a.value : !this.quiet;
-        if (this.quiet) { for (const e of [...this.enemies]) this.kill(e, true); this.shots = []; this.army = null; this.nuke = null; for (const x of [...this.allies]) this.removeAlly(x, true); }
+        if (this.quiet) { for (const e of [...this.enemies]) this.kill(e, true); this.shots = []; this.strikes = []; this.army = null; this.nuke = null; for (const x of [...this.allies]) this.removeAlly(x, true); }
         if (free) h.run(this.quiet ? h.taskQuiet() : h.taskIdle(1), this.quiet ? 'quiet' : 'idle', 95);
         this.dirty();
         break;
@@ -2355,8 +2626,9 @@ class HeroWorld {
   deactivate() {
     for (const e of [...this.enemies]) this.kill(e, true);
     for (const x of [...this.allies]) this.removeAlly(x);
-    this.shots = []; this.beams = []; this.press = null; this.nuke = null; this.army = null;
+    this.shots = []; this.beams = []; this.strikes = []; this.press = null; this.nuke = null; this.army = null; this.screenFlash = null; this.quake = null;
     const h = this.hero;
+    h.frozen = 0;
     if (h.task) { try { h.task.return(); } catch (e) { /* */ } }
     h.task = null; h.taskName = null; h.taskPrio = 0;
     if (h.mode === 'held' || h.mode === 'fall' || h.mode === 'down' || h.mode === 'thrown') { h.mode = 'ground'; h.spin = 0; h.armor = Math.max(h.armor, 35); h.eyes = 1; }
@@ -2400,7 +2672,7 @@ class HeroWorld {
 
   wantsFast() {
     const h = this.hero;
-    return !!(this.press || h.mode !== 'ground' || this.enemies.length || this.shots.length || this.beams.length || h.speed > 1 || this.allies.length || this.nuke || this.army);
+    return !!(this.press || h.mode !== 'ground' || this.enemies.length || this.shots.length || this.beams.length || this.strikes.length || h.speed > 1 || this.allies.length || this.nuke || this.army);
   }
 
   activeIn(near) {
@@ -2423,7 +2695,7 @@ class HeroWorld {
       id: h.id, ally: h.ally, suit: h.suit, callsign: h.callsign, hud: h.hud,
       x: h.x, y: h.y, vx: h.vx, vy: h.vy, facing: h.facing, mode: h.mode, pose: h.pose, poseStart: h.poseStart,
       aim: h.aim, aimArm: h.aimArm, charge: h.charge, beam: h.beamK, eyes: h.eyes, swing: h.swing, spin: h.spin, dist: h.dist, speed: h.speed,
-      power: h.power, armor: h.armor, missiles: h.missiles, hitAt: h.hitAt, status: h.statusText(), task: h.taskName,
+      power: h.power, armor: h.armor, missiles: h.missiles, hitAt: h.hitAt, status: h.statusText(), task: h.taskName, frozen: h.frozen || 0,
       ground: this.groundAt(h.x, h.y), body: this.H.BODY, meters: h.ally ? null : h.meters(),
       ...(h.snapExtra() || {}),
     };
@@ -2439,7 +2711,10 @@ class HeroWorld {
       allies: this.allies.map((x) => this.heroSnap(x)),
       nuke: n && { id: n.id, did: n.did, x: n.x, y: n.y, start: this.wall(n.start), det: this.wall(n.det), dropAt: this.wall(n.dropAt), speed: n.speed, rMax: n.rMax, detonated: n.detonated },
       army: a && { id: a.id, did: a.did, side: a.side, total: a.total, left: a.queue.length + this.enemies.length, legion: this.allies.length, start: this.wall(a.start) },
-      enemies: this.enemies.map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y, vx: e.vx, vy: e.vy, facing: e.facing, hp: e.hp, maxHp: e.maxHp, phase: e.phase, charge: e.charge, hitAt: e.hitAt, aim: e.aim, air: e.air, born: e.born, stun: e.stun || 0, stunKind: e.stunKind || null, spin: e.spin || 0, launch: !!e.launch, grabbed: !!e.grabbed, state: e.state, shield: e.shield || 0, warp: e.warpT || 0, beamAng: e.state === 'firing' ? e.beamAng : null })),
+      enemies: this.enemies.map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y, vx: e.vx, vy: e.vy, facing: e.facing, hp: e.hp, maxHp: e.maxHp, phase: e.phase, charge: e.charge, hitAt: e.hitAt, aim: e.aim, air: e.air, born: e.born, stun: e.stun || 0, stunKind: e.stunKind || null, spin: e.spin || 0, launch: !!e.launch, grabbed: !!e.grabbed, state: e.state, stateT: e.stateT || 0, k: e.k || 1, shield: e.shield || 0, warp: e.warpT || 0, beamAng: e.state === 'firing' ? e.beamAng : null })),
+      flash: this.screenFlash && { at: this.wall(this.screenFlash.at), dur: this.screenFlash.dur, color: this.screenFlash.color },
+      quake: this.quake && { at: this.wall(this.quake.at), dur: this.quake.dur, px: this.quake.px },
+      strikes: this.strikes.map((st) => ({ x: st.x, y: st.y, at: this.wall(st.at) })),
       shots: this.shots.map((p) => ({ id: p.id, kind: p.kind, x: p.x, y: p.y, vx: p.vx, vy: p.vy, owner: p.owner, age: p.age, size: p.size || 1 })),
       beams: this.beams,
       hud: h.hud,

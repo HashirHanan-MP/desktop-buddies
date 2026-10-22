@@ -38,6 +38,7 @@ h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: v
 .qa:hover { background: var(--hover); border-color: var(--accent2); }
 .qa:active { transform: scale(0.97); }
 .qa .e { font-size: 20px; }
+.qa canvas.av { width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
 .qa.on { border-color: var(--accent); background: var(--hover); }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }

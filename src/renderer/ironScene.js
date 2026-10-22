@@ -106,11 +106,12 @@
         ctx.scale(S * h.facing, S);
         ART.drawHero(ctx, rig, { suit: h.suit || s.suit, look: h.ally ? h.suit : s.look, T, h });
         ctx.restore();
-        if (now - h.hitAt < 130) {
+        if (now - h.hitAt < 130 || h.frozen > 0) {
+          // a hit flashes white; frozen in time (Kang) tints cyan
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.globalCompositeOperation = 'source-atop';
-          ctx.fillStyle = 'rgba(255,255,255,0.55)';
+          ctx.fillStyle = h.frozen > 0 ? 'rgba(90,220,255,0.42)' : 'rgba(255,255,255,0.55)';
           ctx.fillRect(0, 0, sprite.c.width, sprite.c.height);
           ctx.restore();
         }
@@ -206,12 +207,12 @@
     const infoOf = (kind) => ENEMY_INFO[kind] || { box: { w: 60, h: 60, ax: 30, ay: 50 }, cy: 0, r: 22 };
 
     function renderEnemies(s, now, T) {
-      const S = s.s;
       const ART = artFor(s.character);
       const seen = new Set();
       const ageOf = (e) => (now - e.born) / 1000;
       for (const e of s.enemies) {
         seen.add(e.id);
+        const S = s.s * (e.k || 1); // Galactus is scaled to fit the screen
         const info = infoOf(e.kind);
         const box = info.box;
         let sp = enemySprites.get(e.id);
@@ -241,7 +242,7 @@
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.globalCompositeOperation = 'source-atop';
           // the giant is hit almost non-stop: a fainter flash keeps him from washing out
-          ctx.fillStyle = e.kind === 'galactus' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)';
+          ctx.fillStyle = e.kind === 'galactus' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.7)';
           ctx.fillRect(0, 0, sp.c.width, sp.c.height);
           ctx.restore();
         }
@@ -344,8 +345,14 @@
     }
 
     // ---------------------------------------------------------------- fx layer (beams, projectiles, nuke)
+    function flashOf(s) {
+      const f = s.flash;
+      return f && Date.now() - f.at < f.dur * 1000 ? f : null;
+    }
+
     function fxBusy(s) {
       if (s.beams && s.beams.length) return true;
+      if (flashOf(s) || (V && V.worldBusy && V.worldBusy(s))) return true;
       const ART = artFor(s.character);
       if (ART.worldBusy && ART.worldBusy(s)) return true;
       if (nukeState(s)) return true;
@@ -364,6 +371,7 @@
           ART.drawWorld(ctx, s, h, v && v.R.pts && now - v.R.pts.at < 200 ? v.R.pts : null, T);
         }
       }
+      if (V && V.drawWorld) V.drawWorld(ctx, s, T, inB);
       for (const p of s.shots || []) {
         const x = p.x + p.vx * k, y = p.y + p.vy * k;
         if (!inB({ x, y }, 40)) continue;
@@ -397,6 +405,21 @@
         }
         ctx.restore();
       }
+      // the snap: the whole screen goes white, then fades
+      const f = flashOf(s);
+      if (f) {
+        const B = env.bounds();
+        const t = (Date.now() - f.at) / 1000;
+        ctx.fillStyle = `rgba(${f.color},${clamp(t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / (f.dur - 0.12), 0, 1) * 0.92})`;
+        ctx.fillRect(B.x, B.y, B.width, B.height);
+      }
+    }
+
+    // the floor shaking under a giant's stomp
+    function quakeShake(q) {
+      if (!q) return 0;
+      const t = (Date.now() - q.at) / 1000;
+      return t < 0 || t > q.dur ? 0 : q.px * (1 - t / q.dur);
     }
 
     // ---------------------------------------------------------------- fx events from the simulation
@@ -471,7 +494,7 @@
     function render(s, now, T) {
       renderEnemies(s, now, T);
       renderHeroes(s, now, T);
-      env.shake(nukeShake(nukeState(s)));
+      env.shake(Math.max(nukeShake(nukeState(s)), quakeShake(s.quake)));
     }
 
     function dispose() {

@@ -22,7 +22,7 @@
     ['✨', 'Clean all', 'cleanAll'], ['🧴', 'Fix all', 'fixAll'], ['🗂️', 'Tidy files', 'tidyFiles'], ['👋', 'Call', 'call'],
   ];
   // Ultron's army, the villains (bosses), and clear-all
-  const ENEMIES = [['🛸', 'Ultron sentry', 'drone'], ['🤖', 'Ultron soldier', 'walker'], ['🦾', 'Ultron heavy', 'tank'], ['🐝', 'Ultron swarm', 'swarm'], ['💎', 'Thanos', 'thanos'], ['🟢', 'Doctor Doom', 'doom'], ['⏳', 'Kang', 'kang'], ['🪐', 'Galactus', 'galactus'], ['🧹', 'Clear', null]];
+  const ENEMIES = [['🛸', 'Ultron sentry', 'drone'], ['🤖', 'Ultron soldier', 'walker'], ['🦾', 'Ultron Prime', 'tank'], ['🐝', 'Ultron swarm', 'swarm'], ['💎', 'Thanos', 'thanos'], ['🟢', 'Doctor Doom', 'doom'], ['⏳', 'Kang', 'kang'], ['🪐', 'Galactus', 'galactus'], ['🧹', 'Clear', null]];
   const STATS = [['meals', 'meals eaten'], ['treats', 'treats'], ['pets', 'pets'], ['poopsCleaned', 'poops scooped'], ['scratchesFixed', 'scratches fixed'], ['filesTidied', 'files tidied'], ['miceCaught', 'mice caught'], ['laserPounces', 'laser pounces'], ['naps', 'naps']];
   const FUR = { white: '#ffffff', cream: '#f6e3c6', silver: '#c9cdd8', ginger: '#f5a65b', black: '#34353f' };
   const EYES = { blue: '#6cb6ff', green: '#8bd06a', amber: '#f3b443', odd: 'linear-gradient(90deg,#6cb6ff 50%,#f3b443 50%)' };
@@ -68,7 +68,18 @@
   quick($('#quick'), QUICK);
   for (const [e, label, kind] of ENEMIES) {
     const b = el('button', 'qa');
-    b.append(el('span', 'e', e), el('span', '', label));
+    // the villain's portrait (villains.js) instead of the emoji
+    let icon = el('span', 'e', e);
+    if (kind && window.VillainArt) {
+      icon = document.createElement('canvas');
+      icon.className = 'av';
+      const d = window.devicePixelRatio || 1, n = 40;
+      icon.width = n * d; icon.height = n * d;
+      const x = icon.getContext('2d');
+      x.setTransform(d, 0, 0, d, 0, 0);
+      VillainArt.drawAvatar(x, kind, n, 1.3, { round: true });
+    }
+    b.append(icon, el('span', '', label));
     b.addEventListener('click', () => (kind ? cmd('spawn', { kind }) : cmd('clearEnemies')));
     $('#ironEnemies').appendChild(b);
   }

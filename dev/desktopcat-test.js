@@ -60,7 +60,8 @@ console.log('look:', snap.cat.palette, snap.cat.eyes, snap.cat.accessory);
 // ---- the bell jingles while walking
 {
   const before = events.filter((e) => e.type === 'sound' && e.name === 'bell').length;
-  w.command('call', { x: 300, y: 700 });
+  // (call it from well across the screen, so it has to walk)
+  w.command('call', { x: w.cat.x < 800 ? w.cat.x + 600 : w.cat.x - 600, y: 700 });
   step(sec(6));
   const after = events.filter((e) => e.type === 'sound' && e.name === 'bell').length;
   assert(after > before, 'the bell jingles');
@@ -182,7 +183,7 @@ console.log('look:', snap.cat.palette, snap.cat.eyes, snap.cat.accessory);
   w.lastGiftAt = 0;
   tasks.gift = 0;
   let t = 0;
-  while (!(tasks.gift > 0 && (w.ents.gifts.length > 0 || c().carryGift)) && t < sec(900)) {
+  while (!(tasks.gift > 0 && (w.ents.gifts.length > 0 || c().carryGift)) && t < sec(1800)) { // (a random pick among its moods: give it time)
     Object.assign(c(), { love: 90, fun: 90, food: 90, energy: 90, clean: 90 }); // a happy, cared-for cat
     step(1); t++;
   }

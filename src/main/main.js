@@ -192,6 +192,7 @@ function init() {
 //   cursor {"x":..,"y":..}  fake the cursor (cursor null = real one again)
 //   down / up               fake left button at the cursor
 //   capture {"dir":"/tmp","around":"cat","r":160}
+//   enemy {"kind":"thanos","hp":20}   change a villain (state, hp…) for a screenshot
 let fakeCursor = null;
 let devBusy = false;
 async function devPoll() {
@@ -224,6 +225,12 @@ async function devPoll() {
       else if (name === 'set') Object.assign(world.cat || world.hero, args);
       else if (name === 'settings') Object.assign(settings, args);
       else if (name === 'cursor') fakeCursor = args && args.x != null ? args : null;
+      else if (name === 'enemy') {
+        // poke a villain for screenshots: enemy {"kind":"kang","state":"freeze","stateT":0}
+        const { kind, ...rest } = args;
+        const e = world.enemies && world.enemies.find((x) => !kind || x.kind === kind);
+        if (e) Object.assign(e, rest);
+      }
       else if (name === 'down') world.pointerDown(currentCursor(), 0);
       else if (name === 'up') world.pointerUp(currentCursor(), 0);
       else if (name === 'menu') openMenu(args.x != null ? args : currentCursor(), args.native ? 'hook' : 'shortcut');
@@ -852,7 +859,7 @@ function updateTrayMenuIfNeeded() {
   ];
   if (hero) {
     tpl.push(
-      { label: 'Deploy enemy', submenu: [['Ultron sentry', 'drone'], ['Ultron soldier', 'walker'], ['Ultron heavy', 'tank'], ['Ultron swarm', 'swarm'], ['Thanos (boss)', 'thanos'], ['Doctor Doom (boss)', 'doom'], ['Kang the Conqueror (boss)', 'kang'], ['Galactus (giant boss)', 'galactus']].map(([l, k]) => ({ label: l, click: () => handleCmd('spawn', { kind: k, ...cur() }) })) },
+      { label: 'Deploy enemy', submenu: [['Ultron sentry', 'drone'], ['Ultron soldier', 'walker'], ['Ultron Prime', 'tank'], ['Ultron swarm', 'swarm'], ['Thanos (boss)', 'thanos'], ['Doctor Doom (boss)', 'doom'], ['Kang the Conqueror (boss)', 'kang'], ['Galactus (giant boss)', 'galactus']].map(([l, k]) => ({ label: l, click: () => handleCmd('spawn', { kind: k, ...cur() }) })) },
       ...world.hero.trayItems().map(([l, c, a]) => ({ label: l, click: () => handleCmd(c, a) })),
     );
   } else if (!inf.dead) {

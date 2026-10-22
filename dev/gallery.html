@@ -14,7 +14,7 @@
 <div id="bar">
   <label>scale <input id="scale" type="range" min="1" max="4" step="0.25" value="2"></label>
   <label>bg <select id="bg"><option>split</option><option>dark</option><option>light</option></select></label>
-  <label>mode <select id="mode"><option>poses</option><option>faces</option><option>props</option><option>iron</option><option>hero</option><option>enemies</option><option>nuke</option></select></label>
+  <label>mode <select id="mode"><option>poses</option><option>faces</option><option>props</option><option>iron</option><option>hero</option><option>enemies</option><option>avatars</option><option>lineup</option><option>nuke</option></select></label>
   <label>hero <select id="hero"></select></label>
   <label>look <select id="look"></select></label>
   <label>suit <select id="suit"></select></label>
@@ -43,7 +43,10 @@ for (const k of Object.keys(IronArt.SUITS)) $('suit').add(new Option(k));
 for (const k of Object.keys(HeroArts)) if (HeroArts[k].makeRig) $('hero').add(new Option(k));
 const IRON = ['stand','idleLook','gauntlet','walk','crouch','hover','flyUp','fly','land','aim','blast','unibeam','missile','punch','thumbsUp','salute','stagger','down','powerDown','held'];
 // enemies mode: kind or kind:state (Ultron's army, then the villains in their attack poses)
-const ENEMY_KINDS = ['drone','mini','walker','tank','thanos','thanos:charging','thanos:throw','thanos:slam','doom','doom:firing','doom:shield','kang','kang:burst','kang:warp','galactus','galactus:charging','galactus:orbs','galactus:stomp'];
+const ENEMY_KINDS = ['drone','mini','walker','tank','doombot','thanos','thanos:charging','thanos:power','thanos:throw','thanos:slam','thanos:snap','doom','doom:firing','doom:storm','doom:summon','doom:shield','kang','kang:burst','kang:freeze','kang:squad','kang:warp','galactus','galactus:charging','galactus:orbs','galactus:stomp','galactus:drain','galactus:meteors'];
+// avatars mode: every villain's portrait, big and menu-sized; lineup: heroes next to the villains, same scale
+const AVATARS = ['drone','mini','walker','tank','doombot','thanos','doom','kang','galactus'];
+const LINEUP = ['ironman','hulk','walker','tank','thanos','doom','kang','galactus'];
 const NUKE = ['t=0.15','t=0.6','t=1.5','t=3','t=5','t=8','bomb','target','shockwave','brace'];
 const params = new URLSearchParams(location.search);
 if (params.get('mode')) $('mode').value = params.get('mode');
@@ -80,7 +83,7 @@ function draw(T) {
   const cols = +(params.get('cols') || (mode === 'faces' ? 6 : 7));
   const cw = 130 * S, ch = (mode === 'faces' ? 110 : 140) * S;
   const HA = HeroArts[$('hero').value] || HeroArts.ironman;
-  let items = mode === 'poses' ? POSES : mode === 'faces' ? FACES : mode === 'iron' ? IRON : mode === 'hero' ? Object.keys(HA.POSES || IronArt.POSES) : mode === 'enemies' ? ENEMY_KINDS : mode === 'nuke' ? NUKE : (window.PropsArt ? PropsArt.GALLERY : []);
+  let items = mode === 'poses' ? POSES : mode === 'faces' ? FACES : mode === 'iron' ? IRON : mode === 'hero' ? Object.keys(HA.POSES || IronArt.POSES) : mode === 'enemies' ? ENEMY_KINDS : mode === 'avatars' ? AVATARS : mode === 'lineup' ? LINEUP : mode === 'nuke' ? NUKE : (window.PropsArt ? PropsArt.GALLERY : []);
   const only = params.get('only');
   if (only) { const set = only.split(','); items = items.filter((it) => set.includes(Array.isArray(it) ? it[0] : (it.name || it))); }
   const rows = Math.ceil(items.length / cols);
@@ -137,12 +140,35 @@ function draw(T) {
     }
     if (mode === 'enemies') {
       const [kind, state] = it.split(':');
-      const air = kind === 'drone' || kind === 'mini' || kind === 'doom';
-      const zoom = kind === 'galactus' ? 0.18 : kind === 'thanos' ? 0.72 : 1;
-      ctx.translate(x + cw / 2, y + ch * (air ? 0.55 : 0.92));
+      const air = kind === 'drone' || kind === 'mini' || kind === 'doom' || kind === 'doombot';
+      const zoom = (+(params.get('zoom') || 1)) * (kind === 'galactus' ? 0.13 : kind === 'thanos' ? 0.5 : kind === 'doom' ? 0.6 : kind === 'kang' ? 0.66 : kind === 'doombot' ? 0.9 : 1);
+      ctx.translate(x + cw / 2, y + ch * (air ? 0.55 : 0.94));
       ctx.scale(S * zoom, S * zoom);
       const charge = state ? 0.5 + 0.5 * Math.sin(T * 3) : 0;
-      IronArt.drawEnemy(ctx, { kind, hp: 2, maxHp: 3, facing: 1, phase: T * 5, charge, vx: 200 * Math.sin(T), state: state && state !== 'shield' && state !== 'warp' ? state : 'idle', shield: state === 'shield' ? 2 : 0, warp: state === 'warp' ? Date.now() - 250 : 0 }, T);
+      IronArt.drawEnemy(ctx, { kind, hp: 2, maxHp: 3, facing: 1, phase: T * 5, charge, vx: 200 * Math.sin(T), state: state && state !== 'shield' && state !== 'warp' ? state : 'idle', stateT: 0.25, shield: state === 'shield' ? 2 : 0, warp: state === 'warp' ? Date.now() - 250 : 0 }, T);
+      ctx.restore();
+      return;
+    }
+    if (mode === 'avatars') {
+      const big = Math.min(cw, ch) - 34;
+      ctx.translate(x + 6, y + 22);
+      VillainArt.drawAvatar(ctx, it, big, T);
+      ctx.translate(big + 4, 0);
+      VillainArt.drawAvatar(ctx, it, 22, T, { round: true });
+      ctx.translate(0, 26);
+      VillainArt.drawAvatar(ctx, it, 18, T);
+      ctx.restore();
+      return;
+    }
+    if (mode === 'lineup') {
+      // everything at the same scale on one floor (Galactus scaled down 4× — he'd fill the page)
+      ctx.translate(x + cw / 2, y + ch * 0.95);
+      const z = S * 0.5 * (it === 'galactus' ? 0.25 : 1);
+      ctx.scale(z, z);
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(-60, 0, 120, 2);
+      if (it === 'ironman') IronArt.drawHero(ctx, IronArt.makeRig('stand', { t: 0, T, phase: 0, m: {} }), { suit: 'classic', T, h: { mode: 'ground', pose: 'stand' } });
+      else if (it === 'hulk') { ctx.scale(HeroArts.hulk.body || 1.4, HeroArts.hulk.body || 1.4); HeroArts.hulk.drawHero(ctx, HeroArts.hulk.makeRig('stand', { t: 0, T, phase: 0, m: { h: {} } }), { T, h: { mode: 'ground' } }); }
+      else IronArt.drawEnemy(ctx, { kind: it, hp: 1, maxHp: 1, facing: 1, phase: 0, charge: 0, vx: 0, state: 'idle', noBar: true }, T);
       ctx.restore();
       return;
     }

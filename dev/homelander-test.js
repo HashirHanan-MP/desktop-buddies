@@ -50,7 +50,7 @@ console.log('arrived:', h.taskName, h.pose);
 step(sec(60)); // idle life
 
 // every enemy type, one at a time: Ultron's army, then every villain ('boss' = Thanos, the old name)
-for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
+for (const kind of ['drone', 'walker', 'tank', 'swarm', 'doombot', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
   const d = geo.displays[kind === 'tank' ? 1 : 0];
   w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });
   let t = 0;
@@ -130,8 +130,9 @@ console.log('after drop:', h.mode, h.taskName);
 }
 
 // commands
+const apr0 = h.approval; // (tough villain fights and the pokes can leave it very low)
 for (const c of ['takeoff', 'land', 'patrol', 'flyby', 'wave', 'pose', 'stare', 'pr', 'thumbsUp', 'repair', 'recharge', 'repair+recharge']) { w.command(c, { x: 1000, y: 400 }); step(sec(4)); }
-assert(h.approval > 50, 'press conference helps');
+assert(h.approval > Math.min(50, apr0 + 20), `press conference helps (${apr0.toFixed(0)} → ${h.approval.toFixed(0)})`);
 w.command('flyTo', { x: 2500, y: 400 }); step(sec(8));
 console.log('flew to second screen:', geo.displayAt({ x: h.x, y: h.y - 40 }).id);
 

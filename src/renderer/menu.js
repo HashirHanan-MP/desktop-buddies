@@ -47,15 +47,15 @@
     out.push({
       icon: '🎯', label: 'Deploy enemy', badge: n || null, hint: 'right here',
       sub: [
-        { icon: '🛸', label: 'Ultron sentry', cmd: 'spawn', args: { kind: 'drone' }, hint: 'flying' },
-        { icon: '🤖', label: 'Ultron soldier', cmd: 'spawn', args: { kind: 'walker' } },
-        { icon: '🦾', label: 'Ultron heavy', cmd: 'spawn', args: { kind: 'tank' }, hint: 'cannon arm' },
-        { icon: '🐝', label: 'Ultron swarm', cmd: 'spawn', args: { kind: 'swarm' }, hint: '6 kamikaze drones' },
+        { icon: '🛸', avatar: 'drone', label: 'Ultron sentry', cmd: 'spawn', args: { kind: 'drone' }, hint: 'flying · twin blasts' },
+        { icon: '🤖', avatar: 'walker', label: 'Ultron soldier', cmd: 'spawn', args: { kind: 'walker' }, hint: 'burst fire' },
+        { icon: '🦾', avatar: 'tank', label: 'Ultron Prime', cmd: 'spawn', args: { kind: 'tank' }, hint: 'plasma shells · blast fan' },
+        { icon: '🐝', avatar: 'mini', label: 'Ultron swarm', cmd: 'spawn', args: { kind: 'swarm' }, hint: '6 kamikaze drones' },
         '-',
-        { icon: '💎', label: 'Thanos', cmd: 'spawn', args: { kind: 'thanos' }, hint: 'boss · Infinity Gauntlet' },
-        { icon: '🟢', label: 'Doctor Doom', cmd: 'spawn', args: { kind: 'doom' }, hint: 'boss · mystic bolts, force field' },
-        { icon: '⏳', label: 'Kang the Conqueror', cmd: 'spawn', args: { kind: 'kang' }, hint: 'boss · time portals' },
-        { icon: '🪐', label: 'Galactus', cmd: 'spawn', args: { kind: 'galactus' }, hint: 'giant boss · Power Cosmic' },
+        { icon: '💎', avatar: 'thanos', label: 'Thanos', cmd: 'spawn', args: { kind: 'thanos' }, hint: 'boss · Infinity Stones, the snap' },
+        { icon: '🟢', avatar: 'doom', label: 'Doctor Doom', cmd: 'spawn', args: { kind: 'doom' }, hint: 'boss · Doombots, lightning storm' },
+        { icon: '⏳', avatar: 'kang', label: 'Kang the Conqueror', cmd: 'spawn', args: { kind: 'kang' }, hint: 'boss · time freeze, portals' },
+        { icon: '🪐', avatar: 'galactus', label: 'Galactus', cmd: 'spawn', args: { kind: 'galactus' }, hint: 'giant boss · drains power' },
         '-',
         { icon: '🧹', label: n ? `Clear all enemies (${n})` : 'No enemies', cmd: 'clearEnemies', disabled: !n },
       ],
@@ -189,7 +189,7 @@
     for (const it of list) {
       if (it === '-') { container.appendChild(el('div', 'sep')); continue; }
       const row = el('div', 'item' + (it.disabled ? ' disabled' : '') + (it.danger ? ' danger' : '') + (it.accent ? ' accent' : '') + (it.urgent ? ' urgent' : ''));
-      row.appendChild(el('span', 'ic', it.icon));
+      row.appendChild(it.avatar && root.VillainArt ? avatarIcon(it.avatar) : el('span', 'ic', it.icon));
       const lab = el('span', 'lab');
       lab.appendChild(el('span', 'tx', it.label));
       if (it.hint) lab.appendChild(el('span', 'hint', it.hint));
@@ -215,6 +215,18 @@
       }
       container.appendChild(row);
     }
+  }
+
+  // a villain's portrait as a menu icon (villains.js draws it)
+  function avatarIcon(kind) {
+    const c = document.createElement('canvas');
+    c.className = 'ic av';
+    const d = window.devicePixelRatio || 1, n = 22;
+    c.width = n * d; c.height = n * d;
+    const x = c.getContext('2d');
+    x.setTransform(d, 0, 0, d, 0, 0);
+    root.VillainArt.drawAvatar(x, kind, n, 1.3, { round: true });
+    return c;
   }
 
   // a hero's avatar: its own drawAvatar, or the bust placed like the armored hero's

@@ -808,6 +808,91 @@
     banner.el.style.transform = `translate3d(${Math.round(left)}px,${Math.round(top)}px,0)`;
   }
 
+  // ---------------------------------------------------------------- villain intro + boss health bars
+  // When a villain arrives on this screen: a big intro card (portrait, name, title), then a health
+  // bar with the portrait at the top of the screen while it lives, below the nuke / army banner.
+  const boss = { bar: document.createElement('div'), intro: document.createElement('div'), rows: new Map(), seen: new Map(), introId: null, introAt: 0 };
+  boss.bar.className = 'bossbar'; boss.bar.style.display = 'none';
+  boss.intro.className = 'bossintro'; boss.intro.style.display = 'none';
+  document.body.appendChild(boss.bar);
+  document.body.appendChild(boss.intro);
+  const villainInfo = (kind) => (window.VillainArt && window.VillainArt.INFO[kind]) || null;
+  function portrait(kind, n) {
+    const c = document.createElement('canvas');
+    const d = window.devicePixelRatio || 1;
+    c.width = n * d; c.height = n * d; c.style.width = n + 'px'; c.style.height = n + 'px';
+    const x = c.getContext('2d');
+    x.setTransform(d, 0, 0, d, 0, 0);
+    window.VillainArt.drawAvatar(x, kind, n, 1.3);
+    return c;
+  }
+
+  function renderBoss() {
+    const s = latest;
+    const here = heroScene() && window.VillainArt ? s.enemies.filter((e) => { const v = villainInfo(e.kind); return v && v.title && inB({ x: e.x, y: e.y - 40 }, 60); }) : [];
+    const now = Date.now();
+    // the intro card for a villain that just arrived
+    for (const e of here) {
+      if (boss.seen.has(e.id)) continue;
+      boss.seen.set(e.id, now);
+      if (now - e.born > 4000) continue; // (already here when this screen started drawing)
+      const v = villainInfo(e.kind);
+      boss.introId = e.id; boss.introAt = now;
+      const el = boss.intro;
+      el.innerHTML = '';
+      el.style.setProperty('--vc', v.color);
+      el.appendChild(portrait(e.kind, 92));
+      const t = txt('div', 'bi-tx');
+      t.appendChild(txt('div', 'bi-warn', '⚠ VILLAIN INCOMING'));
+      t.appendChild(txt('div', 'bi-name', v.name));
+      t.appendChild(txt('div', 'bi-title', v.title));
+      el.appendChild(t);
+      el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    }
+    if (boss.seen.size > 50) for (const id of [...boss.seen.keys()]) if (!s.enemies.some((e) => e.id === id)) boss.seen.delete(id);
+    const top0 = W ? W.y - B.y + 16 : 16;
+    const below = banner.el.style.display !== 'none' ? top0 + banner.el.offsetHeight + 10 : top0;
+    // the health bars
+    const ids = new Set(here.slice(0, 3).map((e) => e.id));
+    for (const [id, row] of boss.rows) if (!ids.has(id)) { row.el.remove(); boss.rows.delete(id); }
+    for (const e of here.slice(0, 3)) {
+      let row = boss.rows.get(e.id);
+      if (!row) {
+        const v = villainInfo(e.kind);
+        const el = txt('div', 'bb-row');
+        el.style.setProperty('--vc', v.color);
+        el.appendChild(portrait(e.kind, 36));
+        const col = txt('div', 'bb-col');
+        const head = txt('div', 'bb-head');
+        head.appendChild(txt('span', 'bb-name', v.name));
+        head.appendChild(txt('span', 'bb-title', v.title));
+        col.appendChild(head);
+        const bar = txt('div', 'bb-bar');
+        const fill = txt('div', 'bb-fill');
+        bar.appendChild(fill);
+        col.appendChild(bar);
+        el.appendChild(col);
+        boss.bar.appendChild(el);
+        row = { el, fill, w: -1 };
+        boss.rows.set(e.id, row);
+      }
+      const w = Math.round(Math.max(0, Math.min(1, e.hp / e.maxHp)) * 1000) / 10;
+      if (w !== row.w) { row.w = w; row.fill.style.width = w + '%'; row.el.classList.toggle('low', w < 30); }
+    }
+    if (boss.rows.size) {
+      boss.bar.style.display = '';
+      const bw = boss.bar.offsetWidth;
+      boss.bar.style.transform = `translate3d(${Math.round((B.width - bw) / 2)}px,${Math.round(below)}px,0)`;
+    } else if (boss.bar.style.display !== 'none') boss.bar.style.display = 'none';
+    const showIntro = boss.introId && now - boss.introAt < 3400 && s.enemies.some((e) => e.id === boss.introId);
+    if (showIntro) {
+      boss.intro.style.display = '';
+      const iw = boss.intro.offsetWidth;
+      const barBottom = below + (boss.rows.size ? boss.bar.offsetHeight + 14 : 0);
+      boss.intro.style.transform = `translate3d(${Math.round((B.width - iw) / 2)}px,${Math.round(Math.max(B.height * 0.2, barBottom))}px,0)`;
+    } else if (boss.intro.style.display !== 'none') { boss.intro.style.display = 'none'; boss.introId = null; }
+  }
+
   // ---------------------------------------------------------------- army launch dialog (from the menu)
   const dialog = { el: document.createElement('div'), open: false, at: null, side: 'right', size: 'medium', openedAt: 0, notes: null };
   dialog.el.className = 'brief armydlg';
@@ -953,6 +1038,7 @@
     }
     if (dialog.open && (!heroScene() || Date.now() - dialog.openedAt > 60000)) closeArmyDialog();
     renderBanner();
+    renderBoss();
     // hero diagnostics card, follows the hero
     let dshow = false;
     if (heroScene() && s.diag && s.hero) {
@@ -989,7 +1075,7 @@
   const MOVING = new Set(['walk', 'run', 'pounce', 'fall', 'held', 'scratchFront', 'cover', 'shake', 'dizzy', 'groom', 'roll', 'standUp']);
   function busyHere() {
     const s = latest;
-    if (panel.el.style.display !== 'none' || diag.el.style.display !== 'none' || dialog.open || banner.el.style.display !== 'none') return true;
+    if (panel.el.style.display !== 'none' || diag.el.style.display !== 'none' || dialog.open || banner.el.style.display !== 'none' || boss.bar.style.display !== 'none' || boss.intro.style.display !== 'none') return true;
     if (heroScene()) return particles.some((p) => inB(p, 60)) || iron.busyHere(s);
     const c = s.cat, S = s.s;
     if (inB({ x: c.x, y: c.y - c.z }, 160 * S)) return true;

@@ -39,7 +39,7 @@ console.log('arrived:', w.hero.taskName, w.hero.pose);
 step(sec(60)); // idle life
 
 // every enemy type, one at a time: Ultron's army, then every villain ('boss' = Thanos, the old name)
-for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
+for (const kind of ['drone', 'walker', 'tank', 'swarm', 'doombot', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
   const d = geo.displays[kind === 'tank' ? 1 : 0];
   w.hero.power = 100; // a breather between fights
   w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });
@@ -48,6 +48,57 @@ for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang'
   console.log(`${kind}: cleared=${!w.enemies.length} in ${(t / 60).toFixed(1)}s, kills=${w.counters.kills}, power=${w.hero.power.toFixed(0)}, missiles=${w.hero.missiles}`);
   assert(!w.enemies.length, `${kind} not defeated`);
   step(sec(4));
+}
+
+// ---- the villains' signature powers (forced, so each one is checked every run)
+{
+  const d = geo.displays[0];
+  const hh = w.hero;
+  const spawnBoss = (kind) => { w.command('clearEnemies'); hh.armor = 100; hh.power = 100; w.command('spawn', { kind, x: d.work.x + d.work.width * 0.75, y: d.work.y + d.work.height * 0.3 }); step(sec(2.5)); return w.enemies.find((e) => e.kind === kind); };
+  const force = (e, state, extra) => Object.assign(e, { state, stateT: 0, stun: 0, cool: 9, ...(extra || {}) });
+  // Thanos: the snap halves the heroes' health once, with a white flash
+  let e = spawnBoss('thanos');
+  hh.armor = 80; e.hp = e.maxHp * 0.3;
+  let t = 0; while (!w.screenFlash && t < sec(3)) { step(1); t++; }
+  assert(e.snapped && w.screenFlash, 'Thanos snaps when he is losing');
+  assert(hh.armor <= 41, `the snap halves the hero's health (${hh.armor.toFixed(0)})`);
+  assert(w.snapshot().flash, 'the snapshot carries the flash');
+  // the Space Stone: through a portal to the hero's side
+  e = spawnBoss('thanos');
+  const x0 = e.x; force(e, 'portal'); step(sec(0.7));
+  assert(Math.abs(e.x - x0) > 50 && Math.abs(e.x - hh.x) < 260 * w.s, 'Thanos jumps through a portal to the hero');
+  // Doctor Doom: Doombots and a lightning storm
+  e = spawnBoss('doom');
+  force(e, 'summon'); step(sec(1));
+  assert(w.enemies.filter((x) => x.kind === 'doombot').length === 2, 'Doom summons two Doombots');
+  force(e, 'storm'); step(sec(0.7));
+  assert(w.strikes.length >= 4 && w.snapshot().strikes.length >= 4, 'the storm marks its bolts on the floor');
+  step(sec(2));
+  assert(fx.stormMark && sounds.lightning, 'and the bolts strike');
+  // Kang: freezes the hero in time, opens portals that drop a squad
+  e = spawnBoss('kang');
+  if (hh.mode !== 'ground' && hh.mode !== 'air') step(sec(1));
+  force(e, 'freeze'); step(sec(0.8));
+  assert(hh.frozen > 0 && w.snapshot().hero.frozen > 0, 'Kang freezes the hero');
+  const fx0 = hh.x; step(sec(0.5));
+  assert(Math.abs(hh.x - fx0) < 0.01, 'a frozen hero does not move');
+  step(sec(1.5));
+  assert(!(hh.frozen > 0), 'and the freeze wears off');
+  const n0 = w.enemies.length; force(e, 'squad'); step(sec(1));
+  assert(w.enemies.length >= n0 + 2, 'Kang opens portals that drop a squad');
+  // Galactus: drains power, rains meteors, the stomp shakes the floor
+  e = spawnBoss('galactus');
+  assert(e.k > 0.5 && w.enemyCenter(e).y < e.y - 150, 'Galactus is scaled to the screen');
+  hh.power = 100; force(e, 'drain'); step(sec(2.6));
+  assert(hh.power < 95 && fx && w.snapshot().beams !== undefined, `Galactus drains the hero's power (${hh.power.toFixed(0)})`);
+  step(sec(1));
+  force(e, 'meteors', { shotsLeft: 8 }); step(sec(1.2));
+  assert(w.shots.some((p) => p.kind === 'meteor'), 'Galactus calls down meteors');
+  step(sec(2)); force(e, 'stomp'); step(sec(1.1));
+  assert(w.quake || fx.quake, 'the stomp shakes the floor');
+  w.command('clearEnemies');
+  console.log('villain powers: snap, space portal, doombots, storm, time freeze, squad, drain, meteors, quake — ok');
+  step(sec(3));
 }
 
 // directed attacks
@@ -78,6 +129,18 @@ for (const kind of ['repulsor', 'missiles', 'unibeam', 'blast']) {
     assert(!w.enemies.length, `${suit} clears the enemies`);
     console.log(`suit ${suit}: body ${hh.bodyScale}, s ${hh.s.toFixed(2)}, a 20-pt hit costs ${lost[suit].toFixed(1)}, cleared 2 enemies in ${(t / 60).toFixed(1)}s, body in snapshot ${w.snapshot().hero.body}`);
     step(sec(2));
+    // every villain, in every suit
+    const times = [];
+    for (const kind of ['thanos', 'doom', 'kang', 'galactus']) {
+      hh.power = 100; hh.armor = 100;
+      w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });
+      let tb = 0;
+      while (w.enemies.length && tb < sec(kind === 'galactus' ? 180 : 90)) { step(1); tb++; if (hh.armor < 30) hh.armor = 80; }
+      assert(!w.enemies.length, `${suit} beats ${kind}`);
+      times.push(`${kind} ${(tb / 60).toFixed(0)}s`);
+      step(sec(3));
+    }
+    console.log(`suit ${suit} vs the villains: ${times.join(', ')}`);
   }
   assert.strictEqual(lost.classic, 20, 'the Mark III takes full damage');
   assert(lost.mark50 < lost.classic && lost.hulkbuster < lost.mark50, 'Mark 50 is tougher, the Hulkbuster tougher still');
@@ -170,22 +233,27 @@ w.command('army', { side: 'left', size: 'medium', x: 800, y: 500 });
   assert.strictEqual(w.allies.length, 0, 'the Legion flies home afterwards');
 }
 
-// ---- legendary battle: 1000 attackers, never more than 7 Legion suits
-{
+// ---- legendary battle: 1000 attackers (Galactus last), never more than 7 Legion suits — in every suit
+for (const suit of ['classic', 'mark50', 'hulkbuster']) {
+  settings.suit = suit;
+  w.hero.armor = 100; w.hero.power = 100;
   w.command('army', { side: 'both', size: 'legendary', x: 800, y: 500 });
   assert(w.army && w.army.total === 1000, 'legendary army has 1000 units');
+  assert.strictEqual(w.army.queue[w.army.queue.length - 1], 'galactus', 'the legendary battle ends with Galactus');
   let t = 0, peakE = 0, peakA = 0;
-  const k0 = w.counters.kills;
+  const k0 = w.counters.kills, g0 = w.counters.galactus;
   while ((w.army || w.allies.length) && t < sec(600)) {
     w.setCursor(cur, DT); w.tick(DT); t++;
     peakE = Math.max(peakE, w.enemies.length); peakA = Math.max(peakA, w.allies.length);
   }
-  console.log(`legendary: done=${!w.army} in ${(t / 60).toFixed(0)}s, kills=${w.counters.kills - k0}, peak enemies=${peakE}, legion=${peakA}`);
-  assert(!w.army, 'the legendary army should be beaten');
+  console.log(`legendary (${suit}): done=${!w.army} in ${(t / 60).toFixed(0)}s, kills=${w.counters.kills - k0}, peak enemies=${peakE}, legion=${peakA}`);
+  assert(!w.army, `the legendary army should be beaten (${suit})`);
   assert(w.counters.kills - k0 >= 1000, 'all 1000 destroyed');
+  assert.strictEqual(w.counters.galactus - g0, 1, 'Galactus falls');
   assert(peakA <= 7, 'at most 7 Legion suits');
   assert(peakE <= 45, 'front line stays manageable');
 }
+settings.suit = 'classic';
 
 // ---- nuke on screen 1 with two screens: he escapes to screen 2 and gets thrown by the wave
 function runNuke(world, gz, label) {

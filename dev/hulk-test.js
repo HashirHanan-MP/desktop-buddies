@@ -48,7 +48,7 @@ step(sec(60)); // idle life
 assert(tasks.hop || tasks.visit || tasks.stroll, 'he moves around when idle');
 
 // every enemy type, one at a time — including flyers he has to leap at
-for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
+for (const kind of ['drone', 'walker', 'tank', 'swarm', 'doombot', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
   const d = geo.displays[kind === 'tank' ? 1 : 0];
   w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });
   let t = 0;

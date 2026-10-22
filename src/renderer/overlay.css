@@ -78,6 +78,7 @@ html, body {
 .item.urgent { animation: urgent 1.1s infinite alternate; }
 @keyframes urgent { from { background: rgba(255, 77, 94, 0.0); } to { background: rgba(255, 77, 94, 0.13); } }
 .ic { width: 20px; text-align: center; font-size: 15px; flex: none; }
+canvas.ic.av { width: 22px; height: 22px; margin: -2px -1px -2px -1px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,0.18); }
 .lab { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .tx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hint { color: var(--menu-sub); font-size: 11px; margin-top: 1px; }
@@ -217,6 +218,47 @@ html, body {
 .banner[data-kind="nuke"] .b1 { color: #ffdd33; font-size: 22px; }
 .banner[data-kind="nuke"] .b2 { color: #ff9a9a; font-size: 16px; font-weight: 800; }
 @keyframes alarm { 50% { border-color: #ffdd33; box-shadow: 0 0 60px rgba(255, 60, 30, 0.9); } }
+
+/* ------------------------------------------------------------ villain intro + boss health bars */
+.bossbar {
+  position: fixed; left: 0; top: 0; z-index: 489000; pointer-events: none;
+  display: flex; flex-direction: column; gap: 6px; width: 440px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+.bb-row {
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px 7px 6px;
+  background: rgba(8, 10, 22, 0.86); border: 1px solid var(--vc, #b86cff); border-radius: 3px;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--vc, #b86cff) 45%, transparent);
+  animation: hudIn 0.4s ease-out;
+}
+.bb-row canvas { flex: none; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2); }
+.bb-col { flex: 1; min-width: 0; }
+.bb-head { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; overflow: hidden; }
+.bb-name { font-size: 13px; font-weight: 800; letter-spacing: 3px; color: #ffffff; }
+.bb-title { font-size: 10px; letter-spacing: 2px; color: var(--vc, #b86cff); }
+.bb-bar { height: 7px; margin-top: 5px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15); }
+.bb-fill { height: 100%; background: var(--vc, #b86cff); box-shadow: 0 0 10px var(--vc, #b86cff); transition: width 0.25s; }
+.bb-row.low .bb-fill { background: #ff4d5e; box-shadow: 0 0 10px #ff4d5e; }
+.bossintro {
+  position: fixed; left: 0; top: 0; z-index: 489500; pointer-events: none;
+  display: flex; align-items: center; gap: 16px; padding: 12px 26px 12px 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  background: linear-gradient(90deg, rgba(6, 8, 18, 0.95), rgba(14, 10, 30, 0.88));
+  border: 1px solid var(--vc, #b86cff); border-left: 4px solid var(--vc, #b86cff); border-radius: 3px;
+  box-shadow: 0 0 50px color-mix(in srgb, var(--vc, #b86cff) 55%, transparent);
+  animation: bossIn 3.4s ease-out forwards;
+}
+.bossintro canvas { flex: none; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 0 24px var(--vc, #b86cff); }
+.bi-warn { font-size: 11px; letter-spacing: 4px; color: #ff6b6b; animation: alarmText 0.5s steps(2) 4; }
+.bi-name { margin-top: 4px; font-size: 30px; font-weight: 900; letter-spacing: 6px; color: #ffffff; text-shadow: 0 0 18px var(--vc, #b86cff); }
+.bi-title { margin-top: 2px; font-size: 13px; letter-spacing: 5px; color: var(--vc, #b86cff); }
+@keyframes bossIn {
+  0% { opacity: 0; clip-path: inset(0 50% 0 50%); }
+  10% { opacity: 1; clip-path: inset(0 0 0 0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes alarmText { 50% { color: #ffd166; } }
 
 /* ------------------------------------------------------------ army launch dialog */
 .armydlg { width: 400px; }

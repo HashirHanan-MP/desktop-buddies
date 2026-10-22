@@ -62,7 +62,7 @@ console.log('arrived:', w.hero.taskName, w.hero.pose, 'x', w.hero.x.toFixed(0));
 step(sec(60)); // idle life
 
 // every enemy type, one at a time: Ultron's army, then every villain ('boss' = Thanos, the old name)
-for (const kind of ['drone', 'walker', 'tank', 'swarm', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
+for (const kind of ['drone', 'walker', 'tank', 'swarm', 'doombot', 'thanos', 'doom', 'kang', 'galactus', 'boss']) {
   const d = geo.displays[kind === 'tank' ? 1 : 0];
   w.hero.power = 100; // a breather between fights (web fluid)
   w.command('spawn', { kind, x: d.work.x + d.work.width * 0.7, y: d.work.y + d.work.height * 0.3 });

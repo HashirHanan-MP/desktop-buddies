@@ -63,12 +63,15 @@ const [maj, min, patch] = pkg.version.split('.').map(Number);
 run(exe(BT, 'aapt2'), ['link', '-I', ANDROID_JAR, '--manifest', path.join(ROOT, 'android', 'AndroidManifest.xml'),
   '--min-sdk-version', '26', '--target-sdk-version', '34',
   '--version-code', String(maj * 10000 + min * 100 + patch), '--version-name', pkg.version,
-  '-A', path.join(OUT, 'assets'), '--java', gen, '-o', unsigned, resZip]);
+  '--java', gen, '-o', unsigned, resZip]);
+// assets go in with jar, not aapt2 -A: on Windows aapt2 stores them with backslash
+// paths (assets/www\mobile\index.html), which Android can't find
+run(exe(path.join(JAVA_HOME, 'bin'), 'jar'), ['--update', '--no-manifest', '--file', unsigned, '-C', OUT, 'assets']);
 
 // 3. Java → dex
 const classes = path.join(OUT, 'classes');
 const sources = [...walk(path.join(ROOT, 'android', 'src'), '.java'), ...walk(gen, '.java')];
-run(exe(path.join(JAVA_HOME, 'bin'), 'javac'), ['-nowarn', '--release', '11',
+run(exe(path.join(JAVA_HOME, 'bin'), 'javac'), ['-nowarn', '--release', '11', '-encoding', 'UTF-8',
   '-classpath', ANDROID_JAR, '-d', classes, ...sources]);
 const dex = path.join(OUT, 'dex');
 fs.mkdirSync(dex, { recursive: true });
@@ -87,4 +90,20 @@ if (!fs.existsSync(KEYSTORE)) {
 run(exe(BT, 'apksigner', true), ['sign', '--ks', KEYSTORE, '--ks-pass', 'pass:android', '--ks-key-alias', 'androiddebugkey',
   '--key-pass', 'pass:android', '--out', APK, aligned]);
 run(exe(BT, 'apksigner', true), ['verify', APK]);
+
+// every file the phone page loads must be in the APK, under a forward-slash path
+const entries = new Set(execFileSync(exe(path.join(JAVA_HOME, 'bin'), 'jar'), ['--list', '--file', APK], { env })
+  .toString().split(/\r?\n/).filter(Boolean));
+const bad = [...entries].filter((e) => e.includes('\\'));
+const page = 'assets/www/mobile/index.html';
+const needed = [page, 'assets/www/home/home.html', 'classes.dex'];
+const html = fs.readFileSync(path.join(www, 'mobile', 'index.html'), 'utf8');
+for (const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) needed.push(path.posix.join('assets/www/mobile', m[1]));
+const missing = needed.filter((e) => !entries.has(e));
+if (bad.length || missing.length) {
+  console.error('APK check failed:', bad.length ? '\n  backslash paths: ' + bad.slice(0, 5).join(', ') : '',
+    missing.length ? '\n  missing: ' + missing.join(', ') : '');
+  process.exit(1);
+}
+console.log(`APK check ok: ${needed.length} page files present`);
 console.log('\nbuilt', path.relative(ROOT, APK), (fs.statSync(APK).size / 1024 / 1024).toFixed(2) + ' MB');

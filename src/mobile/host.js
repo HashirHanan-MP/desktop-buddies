@@ -200,7 +200,7 @@
       reminders: reminders.serialize(), upcoming: reminders.upcoming(),
       others: Object.fromEntries(Object.entries(worlds).map(([ch, w]) => [ch, w.info()])),
       characters: CHARACTERS.map((id) => ({ id, name: nameOf(id), home: id === 'cat' ? 'Cat Home' : HEROES[id].HOME })),
-      appName: APP_NAME, hidden: false, hook: { ok: true }, platform: 'android', shortcut: '', version: '2.1.0',
+      appName: APP_NAME, hidden: false, hook: { ok: true }, platform: 'android', shortcut: '', version: '2.1.1',
     };
   }
 
@@ -257,7 +257,10 @@
   };
 
   // ------------------------------------------------------------ home screen (home.html in a frame)
-  let homeOpen = false, homeFrame = null, homeTimer = null;
+  let homeOpen = false, homeFrame = null, homeTimer = null, homeReady = false, homeTab = null;
+  const STAY_IN_HOME = new Set(['setting', 'rename', 'character', 'wear', 'resetCat', 'adopt', 'enableHook', 'focusStop',
+    'reminderAdd', 'reminderUpdate', 'reminderRemove', 'show']);
+  const noWorldPress = (el) => { for (const ev of ['pointerdown', 'pointerup']) el.addEventListener(ev, (e) => e.stopPropagation()); };
   function openHome(tab) {
     closeMenu();
     if (!homeFrame) {
@@ -267,11 +270,13 @@
       document.body.appendChild(wrap);
       homeFrame = wrap;
       wrap.querySelector('.mh-close').addEventListener('click', closeHome);
+      noWorldPress(wrap);
     }
     homeFrame.style.display = '';
     homeOpen = true;
     const post = (msg) => { const f = homeFrame.querySelector('iframe'); if (f && f.contentWindow) f.contentWindow.postMessage(msg, '*'); };
-    if (tab) setTimeout(() => post({ buddy: 'event', ch: 'home:tab', data: tab }), 300);
+    // a tab asked for before home.html has loaded is sent once it asks for its state
+    if (tab) { if (homeReady) post({ buddy: 'event', ch: 'home:tab', data: tab }); else homeTab = tab; }
     clearInterval(homeTimer);
     homeTimer = setInterval(() => post({ buddy: 'event', ch: 'home:state', data: homePayload() }), 400);
     updateTouch();
@@ -288,8 +293,18 @@
     const m = ev.data;
     if (!m || !m.buddy || !homeFrame) return;
     const f = homeFrame.querySelector('iframe');
-    if (m.buddy === 'send' && m.ch === 'cmd' && m.data) { if (m.data.name === 'home') return; handleCmd(m.data.name, m.data.args); }
-    else if (m.buddy === 'invoke' && m.ch === 'home:get') f.contentWindow.postMessage({ buddy: 'reply', id: m.id, data: homePayload() }, '*');
+    if (m.buddy === 'sheet') homeFrame.querySelector('.mh-close').style.display = m.open ? 'none' : '';
+    else if (m.buddy === 'send' && m.ch === 'cmd' && m.data) {
+      if (m.data.name === 'home') return;
+      handleCmd(m.data.name, m.data.args);
+      // the home screen covers the whole phone: get out of the way so the feeding,
+      // toy, villain or army can be seen (settings and reminder edits stay put)
+      if (!STAY_IN_HOME.has(m.data.name)) closeHome();
+    } else if (m.buddy === 'invoke' && m.ch === 'home:get') {
+      f.contentWindow.postMessage({ buddy: 'reply', id: m.id, data: homePayload() }, '*');
+      homeReady = true;
+      if (homeTab) { f.contentWindow.postMessage({ buddy: 'event', ch: 'home:tab', data: homeTab }, '*'); homeTab = null; }
+    }
   });
 
   // ------------------------------------------------------------ Android: where may touches land?
@@ -317,6 +332,23 @@
     try { A.setTouch(mode, r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0); } catch (e) { /* */ }
   }
 
+  // ------------------------------------------------------------ "put it away" while a toy is out
+  // (a toy follows the finger and takes every touch; phones have no Esc or right-click)
+  let putAwayBtn = null;
+  function syncPutAway() {
+    const show = !!world.tool && !homeOpen && !menuOpen;
+    if (!putAwayBtn) {
+      if (!show) return;
+      putAwayBtn = document.createElement('button');
+      putAwayBtn.id = 'mobile-putaway';
+      putAwayBtn.textContent = '✕ Put it away';
+      putAwayBtn.addEventListener('click', () => handleCmd('stopTool'));
+      noWorldPress(putAwayBtn);
+      document.body.appendChild(putAwayBtn);
+    }
+    putAwayBtn.style.display = show ? '' : 'none';
+  }
+
   // ------------------------------------------------------------ main loop
   let lastTick = Date.now(), lastSlow = 0;
   function tick() {
@@ -335,6 +367,7 @@
       const a = world.announcement;
       if (a && t - a.start > 10 * 60 * 1000) resolveReminder(a.id, 'done');
     }
+    syncPutAway();
     updateTouch();
   }
 

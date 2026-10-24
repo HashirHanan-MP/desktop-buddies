@@ -13,6 +13,13 @@ html, body { touch-action: none; -webkit-tap-highlight-color: transparent; }
 .armydlg .dlg-row button { min-width: 40%; }
 .banner { min-width: 0; max-width: calc(100vw - 24px); }
 
+/* shown while a toy (laser, mouse, yarn…) follows the finger */
+#mobile-putaway {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(22px + var(--inset-bottom, 0px)); z-index: 500000;
+  border: 0; border-radius: 22px; padding: 12px 20px; font: 700 15px system-ui, sans-serif;
+  background: rgba(30, 30, 40, 0.85); color: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
 /* the home screen, full screen over the buddies */
 #mobile-home { position: fixed; inset: 0; z-index: 600000; background: rgba(0, 0, 0, 0.35); }
 #mobile-home iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #f7f5fc; }

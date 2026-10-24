@@ -125,7 +125,12 @@ public class BuddyService extends Service {
                 pending.clear();
             }
         });
-        web.setWebChromeClient(new WebChromeClient());
+        // a service can't show Android's dialogs; the pages use in-page sheets instead
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onJsAlert(WebView v, String url, String msg, android.webkit.JsResult r) { r.confirm(); return true; }
+            @Override public boolean onJsConfirm(WebView v, String url, String msg, android.webkit.JsResult r) { r.cancel(); return true; }
+            @Override public boolean onJsPrompt(WebView v, String url, String msg, String def, android.webkit.JsPromptResult r) { r.cancel(); return true; }
+        });
         web.addJavascriptInterface(new Bridge(), "AndroidBridge");
 
         webLp = new WindowManager.LayoutParams(

@@ -153,6 +153,38 @@ all three systems: push a tag like `v3.0.0` or run it manually, then download th
 installers from the run's *Artifacts*. Builds are unsigned (macOS: right-click →
 *Open* the first time; Windows: SmartScreen may ask to confirm).
 
+## 📱 Android
+
+The buddies also run on Android phones, drawn **over your other apps** like on a
+desktop. The same simulation and drawings run in a WebView (`src/mobile/`: `host.js`
+stands in for the Electron main process); a small Java shell (`android/`) puts it in
+a "display over other apps" overlay with a foreground service.
+
+```bash
+npm run android            # → dist/android/DesktopBuddies.apk (all-in-one edition)
+```
+
+Needs JDK 17 (`JAVA_HOME`) and the Android SDK (`ANDROID_HOME`) with
+`platforms;android-34` and `build-tools;34.0.0`. There is no Gradle: the script calls
+aapt2, javac, d8, zipalign and apksigner directly, and signs with
+`~/.android/debug.keystore` (made on first build). Android icons come from
+`python scripts/make-android-icons.py`.
+
+On the phone: install the APK (allow installs from your browser / file manager),
+open **Desktop Buddies**, allow *Display over other apps*, tap **Start buddies**.
+Tap a buddy to boop it, drag to carry it, press and hold for its menu; the
+notification has Menu, Home and Stop. Touches anywhere else go to the app below.
+Android 12+ only lets touches pass through an overlay that is at most 80% opaque, so
+the buddies are drawn slightly see-through until you open a menu.
+
+To try the phone layout in a desktop browser, serve `src/` (e.g.
+`python -m http.server -d src 8771`) after `npm run mobile` and open
+`http://localhost:8771/mobile/index.html`.
+
+**iOS** doesn't allow apps to draw over other apps, so an iPhone version can only show
+the buddies inside its own app (the same `src/mobile` page in a WKWebView). Building it
+needs a Mac with Xcode.
+
 ## Controls
 
 | Do this | Cat | Heroes |

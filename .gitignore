@@ -1,4 +1,6 @@
-node_modules/
-dist/
 .DS_Store
+build/android/
+dist/
+node_modules/
 scripts/_icon.html
+src/mobile/sim.js

@@ -20,6 +20,8 @@
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
+    "android": "node scripts/build-android.js",
+    "mobile": "node scripts/build-mobile.js",
     "editions": "node scripts/build-editions.js",
     "editions:win": "node scripts/build-editions.js --win",
     "editions:mac": "node scripts/build-editions.js --mac",

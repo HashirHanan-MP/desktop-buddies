@@ -200,7 +200,7 @@
       reminders: reminders.serialize(), upcoming: reminders.upcoming(),
       others: Object.fromEntries(Object.entries(worlds).map(([ch, w]) => [ch, w.info()])),
       characters: CHARACTERS.map((id) => ({ id, name: nameOf(id), home: id === 'cat' ? 'Cat Home' : HEROES[id].HOME })),
-      appName: APP_NAME, hidden: false, hook: { ok: true }, platform: 'android', shortcut: '', version: '2.1.1',
+      appName: APP_NAME, hidden: false, hook: { ok: true }, platform: 'android', shortcut: '', version: '2.2.0',
     };
   }
 

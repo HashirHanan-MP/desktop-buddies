@@ -9,7 +9,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const MODULES = [
   'main/geometry.js', 'main/names.js', 'main/world.js', 'main/ironman.js', 'main/reminders.js', 'main/editions.js', 'main/sysinfo.js',
-  'main/heroes/index.js', 'main/heroes/homelander.js', 'main/heroes/hulk.js', 'main/heroes/spiderman.js',
+  'main/heroes/index.js', 'main/heroes/homelander.js', 'main/heroes/hulk.js', 'main/heroes/spiderman.js', 'main/heroes/thor.js',
 ];
 const edition = process.argv[2] || 'all';
 

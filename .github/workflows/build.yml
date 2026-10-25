@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        edition: [all, cat, ironman, homelander, hulk, spiderman]
+        edition: [all, cat, ironman, thor, homelander, hulk, spiderman]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

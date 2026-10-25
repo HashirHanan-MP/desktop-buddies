@@ -37,6 +37,43 @@
 .brief[data-theme="cozy"] button { border-color: rgba(232, 116, 59, 0.5); color: #e8743b; border-radius: 12px; }
 .brief[data-theme="cozy"] button.primary { background: #e8743b; color: #fff; border-color: #e8743b; }
 
+/* ------------------------------------------------------------ Thor: Asgard (storm blue, silver, cape red) */
+.menu[data-theme="asgard"], .brief[data-theme="asgard"] {
+  background: linear-gradient(165deg, rgba(26, 36, 70, 0.97), rgba(8, 12, 28, 0.98));
+  color: #eef3ff;
+  border: 1px solid rgba(159, 198, 255, 0.7);
+  box-shadow: 0 0 0 1px rgba(159, 198, 255, 0.15), 0 0 26px rgba(120, 170, 255, 0.22), 0 14px 40px rgba(0, 0, 0, 0.55);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+}
+.menu[data-theme="asgard"] { border-radius: 8px; }
+.menu[data-theme="asgard"]::after, .brief[data-theme="asgard"]::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; border-radius: 8px 8px 0 0; pointer-events: none;
+  background: linear-gradient(90deg, #b5202b, #e3b448 30%, #9fc6ff 60%, #b5202b);
+}
+.menu[data-theme="asgard"] .item { border-radius: 5px; }
+.menu[data-theme="asgard"] .item:hover, .menu[data-theme="asgard"] .item.open { background: rgba(140, 185, 255, 0.15); }
+.menu[data-theme="asgard"] .name { color: #cfe2ff; letter-spacing: 4px; font-weight: 800; font-size: 14px; text-transform: uppercase; text-shadow: 0 0 8px rgba(140, 190, 255, 0.6); }
+.menu[data-theme="asgard"] .mood { color: #a9bce0; font-size: 11px; }
+.menu[data-theme="asgard"] .hint { color: rgba(190, 210, 245, 0.6); }
+.menu[data-theme="asgard"] .sep { background: rgba(159, 198, 255, 0.25); }
+.menu[data-theme="asgard"] .meters, .menu[data-theme="asgard"] .foot { border-color: rgba(159, 198, 255, 0.25); }
+.menu[data-theme="asgard"] .bar { background: rgba(159, 198, 255, 0.15); }
+.menu[data-theme="asgard"] .badge { background: #b5202b; }
+.menu[data-theme="asgard"] .item.accent .tx, .menu[data-theme="asgard"] .check { color: #9fc6ff; }
+.menu[data-theme="asgard"] .foot { color: rgba(190, 210, 245, 0.6); }
+.menu[data-theme="asgard"] .item.danger .tx { color: #ff6b6b; }
+.menu[data-theme="asgard"] .avatar { box-shadow: 0 0 0 2px #9fc6ff, 0 0 12px rgba(120, 170, 255, 0.5); }
+.brief[data-theme="asgard"] { width: 370px; border-radius: 8px; overflow: hidden; }
+.brief[data-theme="asgard"]::after { display: none; }
+.brief[data-theme="asgard"] .brief-head { color: #cfe2ff; letter-spacing: 3px; font-size: 12px; text-transform: uppercase; }
+.brief[data-theme="asgard"] .brief-time { color: #a9bce0; }
+.brief[data-theme="asgard"] .brief-task { color: #ffffff; }
+.brief[data-theme="asgard"] .brief-quip { color: #d6e2fa; font-style: italic; }
+.brief[data-theme="asgard"] button { border-radius: 5px; border-color: rgba(159, 198, 255, 0.6); color: #cfe2ff; }
+.brief[data-theme="asgard"] button.primary { background: #b5202b; color: #ffffff; border-color: #e3b448; }
+.armydlg[data-theme="asgard"] .dlg-label { color: #cfe2ff; }
+.armydlg[data-theme="asgard"] .dlg-row button.on { background: rgba(140, 185, 255, 0.25); color: #fff; border-color: #9fc6ff; box-shadow: none; }
+
 /* ------------------------------------------------------------ Homelander: Vought corporate */
 .menu[data-theme="vought"], .brief[data-theme="vought"] {
   background: linear-gradient(165deg, rgba(14, 30, 70, 0.97), rgba(6, 14, 36, 0.98));

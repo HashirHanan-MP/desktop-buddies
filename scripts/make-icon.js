@@ -6,7 +6,7 @@ const { app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const HEROES = ['homelander', 'hulk', 'spiderman'];
+const HEROES = ['thor', 'homelander', 'hulk', 'spiderman'];
 
 const html = `<!doctype html><html><body style="margin:0;background:transparent">
 <script src="../src/renderer/catArt.js"></script>

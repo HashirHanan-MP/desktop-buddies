@@ -8,7 +8,7 @@
  */
 
 const EDITIONS = {
-  all: { appName: 'Desktop Buddies', appId: 'app.desktopbuddies', characters: ['cat', 'ironman', 'homelander', 'hulk', 'spiderman'], icon: 'icon.png' },
+  all: { appName: 'Desktop Buddies', appId: 'app.desktopbuddies', characters: ['cat', 'ironman', 'thor', 'homelander', 'hulk', 'spiderman'], icon: 'icon.png' },
   // the standalone cat app has its own cat: a ginger tabby with a collar & bell, plus levels,
   // outfits, a focus timer, the feather wand and gifts (World `extras`), its own logo and theme
   cat: {
@@ -18,6 +18,7 @@ const EDITIONS = {
   homelander: { appName: 'Desktop Homelander', appId: 'app.desktopbuddies.homelander', characters: ['homelander'], icon: 'icon-homelander.png' },
   hulk: { appName: 'Desktop Hulk', appId: 'app.desktopbuddies.hulk', characters: ['hulk'], icon: 'icon-hulk.png' },
   spiderman: { appName: 'Desktop Spider-Man', appId: 'app.desktopbuddies.spiderman', characters: ['spiderman'], icon: 'icon-spiderman.png' },
+  thor: { appName: 'Desktop Thor', appId: 'app.desktopbuddies.thor', characters: ['thor'], icon: 'icon-thor.png' },
   ironman: { appName: 'Desktop Iron Man', appId: 'app.desktopbuddies.ironman', characters: ['ironman'], icon: 'icon-ironman.png' },
 };
 for (const [id, e] of Object.entries(EDITIONS)) e.id = id;

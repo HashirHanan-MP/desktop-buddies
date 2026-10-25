@@ -187,6 +187,25 @@ body[data-theme="iron"] select, body[data-theme="iron"] input[type="time"], body
 body[data-theme="iron"] .toggle:checked { background: #2fb8e0; }
 body[data-theme="iron"] .rem-quick button { border-radius: 2px; background: rgba(0, 0, 0, 0.3); }
 
+/* ------------------------------------------------------------ Thor: Asgard theme */
+body[data-theme="asgard"] {
+  --bg: #0a1022; --card: #131c38; --fg: #eef3ff; --sub: #a9bce0; --line: rgba(159, 198, 255, 0.2);
+  --accent: #9fc6ff; --accent2: rgba(159, 198, 255, 0.35); --hover: rgba(140, 185, 255, 0.12); --warn: #ff6b6b;
+  background: radial-gradient(1100px 480px at 50% -140px, rgba(110, 150, 255, 0.28), transparent 60%), #0a1022;
+}
+body[data-theme="asgard"] .hero { background: linear-gradient(160deg, rgba(181, 32, 43, 0.28), transparent 70%); border-bottom: 3px solid transparent; border-image: linear-gradient(90deg, #b5202b, #e3b448 35%, #9fc6ff 65%, #b5202b) 3; }
+body[data-theme="asgard"] .name { color: #cfe2ff; letter-spacing: 4px; font-weight: 800; text-transform: uppercase; text-shadow: 0 0 10px rgba(140, 190, 255, 0.5); }
+body[data-theme="asgard"] .chip { background: rgba(140, 185, 255, 0.15); color: #cfe2ff; }
+body[data-theme="asgard"] .tabs button { text-transform: uppercase; letter-spacing: 1px; font-size: 11.5px; }
+body[data-theme="asgard"] h3 { color: #9fc6ff; letter-spacing: 2px; }
+body[data-theme="asgard"] .stat b { color: #cfe2ff; }
+body[data-theme="asgard"] .btn { background: #b5202b; color: #fff; border-color: #e3b448; }
+body[data-theme="asgard"] .btn.warn { background: transparent; color: var(--warn); border-color: var(--warn); }
+body[data-theme="asgard"] .btn.ghost { background: transparent; color: #cfe2ff; }
+body[data-theme="asgard"] select, body[data-theme="asgard"] input[type="time"], body[data-theme="asgard"] #remText, body[data-theme="asgard"] .rem-text { background: rgba(0, 0, 0, 0.3); color-scheme: dark; }
+body[data-theme="asgard"] .toggle:checked { background: #5d8fe6; }
+body[data-theme="asgard"] .need .bar { background: rgba(159, 198, 255, 0.12); }
+
 /* ------------------------------------------------------------ Homelander: Vought Tower theme */
 body[data-theme="vought"] {
   --bg: #08122b; --card: #0f1f45; --fg: #f4f1e6; --sub: #a9b6d6; --line: rgba(212, 175, 55, 0.22);

@@ -1,10 +1,10 @@
 /*
- * Desktop Buddies — overlay renderer for the hero (Iron Man, Homelander, Hulk,
+ * Desktop Buddies — overlay renderer for the hero (Iron Man, Thor, Homelander, Hulk,
  * Spider-Man), the allies, enemies, projectiles and the nuke.
  * Created by overlay.js with shared helpers (sprites, particles, bounds).
  *
  * Each hero's look comes from HeroArts[character] (ironArt.js, heroes/*.js):
- *   name, theme             menu header / CSS theme ('iron', 'vought', 'gamma', 'spider')
+ *   name, theme             menu header / CSS theme ('iron', 'asgard', 'vought', 'gamma', 'spider')
  *   makeRig(pose, c), lerpRig(a, b, k), drawHero(ctx, rig, { look, T, h })
  *   points(rig)             hero-local attach points: { reactor, palms[], head, eyes?, hand? }
  *   drawBust(ctx, look, T)  avatar for menus and the home window
@@ -18,6 +18,7 @@
  *   drawWorld(ctx, s, h, pts, T)  full-screen extras (web lines…); worldBusy(s) keeps that layer alive
  *   expandFx(e, S, spawn)   → true if it handled this fx event
  *   drawEnemyOverlay(ctx, e, T, cy)  drawn over an enemy (e.g. web on a stunned one; e.stun, e.stunKind)
+ *   drawBeam(ctx, b, x1, y1, S, age, life, T, pts)  → true if it drew this hero beam itself (Thor's lightning)
  */
 (function (root) {
   'use strict';
@@ -392,6 +393,7 @@
         const age = (Date.now() - b.start) / 1000;
         const life = clamp(1 - age / b.dur, 0, 1);
         if (b.owner === 'enemy' && V && V.drawBeam(ctx, b, x1, y1, S, age, life, T)) continue;
+        if (b.owner !== 'enemy' && ART.drawBeam && ART.drawBeam(ctx, b, x1, y1, S, age, life, T, v ? v.R.pts : null)) continue;
         const own = b.owner !== 'enemy' && ART.beamColors ? ART.beamColors(b) : null;
         const halo = own ? own.halo : b.owner === 'enemy' ? '255,40,60' : '120,225,255';
         const core = own ? own.core : b.owner === 'enemy' ? 'rgba(255,220,220,0.95)' : null;

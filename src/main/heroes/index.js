@@ -11,6 +11,7 @@ const HEROES = {
   homelander: require('./homelander'),
   hulk: require('./hulk'),
   spiderman: require('./spiderman'),
+  thor: require('./thor'),
 };
 
 module.exports = HEROES;

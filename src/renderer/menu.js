@@ -11,7 +11,7 @@
   let hoverTimer = null, closeTimer = null, meterTimer = null, lastInside = 0;
 
   const TOOL_LABEL = { scoop: 'Poop scoop', repair: 'Repair spray', brush: 'Brush', mouse: 'Mouse chase', laser: 'Laser pointer', treat: 'Treat in hand', feather: 'Feather wand' };
-  const CHAR_ICON = { cat: '🐱', ironman: '🦾', homelander: '🦅', hulk: '👊', spiderman: '🕷️' };
+  const CHAR_ICON = { cat: '🐱', ironman: '🦾', thor: '⚡', homelander: '🦅', hulk: '👊', spiderman: '🕷️' };
   const isHero = (s) => s.character !== 'cat';
   const artOf = (ch) => (root.HeroArts && root.HeroArts[ch]) || root.HeroArts.ironman;
   const appName = () => (info && info.appName) || 'Desktop Buddies';

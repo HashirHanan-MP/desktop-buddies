@@ -47,7 +47,7 @@ public class MainActivity extends Activity {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, px(12), 0, px(4));
         col.addView(title);
-        TextView sub = text("A cat, Iron Man, Homelander, Hulk and Spider-Man living on top of your apps — with Thanos, Doom, Kang, Ultrons and Galactus to fight.", 15, Color.rgb(90, 85, 110));
+        TextView sub = text("A cat, Iron Man, Thor, Homelander, Hulk and Spider-Man living on top of your apps — with Thanos, Doom, Kang, Ultrons and Galactus to fight.", 15, Color.rgb(90, 85, 110));
         sub.setGravity(Gravity.CENTER);
         col.addView(sub);
 

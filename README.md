@@ -1,10 +1,12 @@
-# 🐱🦾🦅👊🕷️ Desktop Buddies
+# 🐱🦾⚡🦅👊🕷️ Desktop Buddies
 
 Little companions that live on your desktop — on **Windows, macOS and Linux**.
 
 - **Cat** — a small white cat with needs, moods and a mess to clean up.
 - **Iron Man** — an armored hero who lives on the floor of your screens, flies,
   and fights the enemies you drop on him.
+- **Thor** — the God of Thunder in four looks: throws Mjolnir (or Stormbreaker),
+  calls lightning from the sky and arrives by Bifrost.
 - **Homelander** — flies like he owns the place, burns enemies with heat vision.
 - **Hulk** — can't fly, so he leaps; smashes, claps and throws things.
 - **Spider-Man** — swings on webs from the top of your screen and webs enemies up.
@@ -14,7 +16,7 @@ underneath, and they can all **remind you of things**: at the time you set, your
 buddy comes to the middle of the main screen and tells you what to do.
 
 Everything is drawn in code and every sound is synthesized — there are no image
-or audio assets. (Iron Man, Homelander, Hulk and Spider-Man here are original
+or audio assets. (Iron Man, Thor, Homelander, Hulk and Spider-Man here are original
 fan-made drawings for personal use; the characters belong to Marvel and to
 Amazon / The Boys. If you publish this widely, rename them.)
 
@@ -27,12 +29,13 @@ icon and save, so you can install any of them (or several side by side):
 |---|---|---|
 | **Desktop Cat** | its own ginger tabby, with levels, outfits, focus timer, feather wand & gifts | `node scripts/build-editions.js cat` |
 | **Desktop Iron Man** | Iron Man — Mark III, Mark 50 nanotech or the Hulkbuster | `node scripts/build-editions.js ironman` |
+| **Desktop Thor** | Thor — Classic (Mjolnir), Ragnarok, Infinity War (Stormbreaker) or Love & Thunder | `node scripts/build-editions.js thor` |
 | **Desktop Homelander** | Homelander | `node scripts/build-editions.js homelander` |
 | **Desktop Hulk** | Hulk | `node scripts/build-editions.js hulk` |
 | **Desktop Spider-Man** | Spider-Man | `node scripts/build-editions.js spiderman` |
-| **Desktop Buddies** | all five, switch from the menu | `node scripts/build-editions.js all` |
+| **Desktop Buddies** | all six, switch from the menu | `node scripts/build-editions.js all` |
 
-`npm run editions` builds the five single-character apps for the current OS
+`npm run editions` builds the six single-character apps for the current OS
 (add `--win`, `--mac` or `--linux`, and `--x64` to skip arm64). Installers land in
 `dist/<edition>/`. To try one without building: `npm run start:hulk` (or
 `start:cat`, `start:ironman`, `start:homelander`, `start:spiderman`) — each keeps its own save.
@@ -75,6 +78,17 @@ Desktop Cat is its own app with its own look — not the all-in-one's white cat:
 | **Power & armor** | Flying and weapons drain the arc reactor, standing on the floor recharges it, missiles reload over time. At zero armor the suit goes **offline**, falls and **reboots**. Menu → *Suit* → repair / recharge. |
 | **More** | Patrols, fly-bys, area scans, **diagnostics** (your real CPU, memory, battery, uptime in a HUD card), thumbs-up, eight suit colors, random invasions (off by default), difficulty, stand-by mode. Drag him and let go — his thrusters catch him. |
 | **HUD look** | His menu and the home window ("HQ") switch to a holographic HUD theme. |
+
+## ⚡ Thor
+
+| | |
+|---|---|
+| **Four looks** | **Classic** (Avengers armor, long hair, Mjolnir), **Ragnarok** (short hair, bare arms, no hammer — the lightning comes from his hands, and his eyes light up), **Infinity War** (full beard, Stormbreaker) and **Love & Thunder** (blue-and-gold armor, long hair, Stormbreaker). Pick one under *Thunder & mead* in his menu or in Settings. |
+| **Flight** | He whirls the weapon at arm's length and launches; flies weapon-first with a long red cape streaming behind him; lands softly or comes down like a thunderbolt. He arrives — and jumps between screens — by **Bifrost**: a rainbow column from the sky that leaves a rune circle on the floor. |
+| **Weapons** | **Lightning** crackles from the weapon; **Call the lightning** brings a bolt down from the sky that jumps from one enemy to the next and stuns them; he **throws** Mjolnir or Stormbreaker through a whole line of enemies and it **flies back into his hand**; a **smash** sends things flying; a **thunder slam** from the sky stuns everything around. Ragnarok fires a two-handed **lightning blast** instead of a throw. |
+| **Storm** | His third meter fills with every hit he lands (and takes). When it's full, the **God of Thunder**: he rises, lit up, and strikes every enemy on the screen at once. He takes less than half of every hit; at zero he's dazed, then gets up with lightning in his eyes. |
+| **Fights alone** | Beats a 1000-unit legendary army by himself. The nuke? He plants his feet and raises the weapon. |
+| **More** | Twirls Mjolnir by its strap, tosses it up and catches it, summons the storm to recharge, drinks mead (and smashes the cup — *"Another!"*). His home is *Asgard*. |
 
 ## 🦅 Homelander
 
@@ -214,7 +228,7 @@ needs a Mac with Xcode.
 ```
 src/main/main.js       Electron main: overlays per display, click-through, tray, menu, IPC,
                        character switching, reminders, saving (+ import from "Desktop Cat")
-src/main/editions.js   Which app this is (Desktop Buddies / Cat / Homelander / Hulk / Spider-Man)
+src/main/editions.js   Which app this is (Desktop Buddies / Cat / Iron Man / Thor / Homelander / Hulk / Spider-Man)
 src/main/world.js      Cat simulation: needs, generator "tasks" brain, entities, tools
 src/main/ironman.js    Hero world: floor per screen, enemy AI, projectiles, beams, damage,
                        stun / knock-back / grab, nuke, armies, allies — plus Iron Man himself
@@ -250,6 +264,6 @@ src/home/                 Home window (Cat Home / HQ), reminders editor
 
 ## Ideas for later
 
-More characters (a Venom, a Thor…), kitten → adult growth, sitting on top of windows, reacting to
+More characters (a Venom, a Captain America…), kitten → adult growth, sitting on top of windows, reacting to
 typing, achievements, a boss-rush mode, buddies that meet each other, calendar import
 for reminders.

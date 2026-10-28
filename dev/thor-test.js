@@ -149,8 +149,13 @@ settings.thorLook = 'ragnarok';
 w.command('twirl'); step(sec(2));
 assert.notStrictEqual(h.taskName, 'twirl', 'no weapon to twirl in Ragnarok');
 settings.thorLook = 'classic';
-w.command('bifrost', { x: 1000, y: 400 }); step(sec(2));
-assert.strictEqual(geo.displayAt({ x: h.x, y: h.y - 40 }).id, 2, 'Bifrost to the other screen');
+{
+  // (earlier patrols may have left him on either screen)
+  step(sec(6));
+  const from = geo.displayAt({ x: h.x, y: h.y - 40 }).id;
+  w.command('bifrost', { x: 1000, y: 400 }); step(sec(2));
+  assert.notStrictEqual(geo.displayAt({ x: h.x, y: h.y - 40 }).id, from, 'Bifrost to the other screen');
+}
 w.command('flyTo', { x: 600, y: 400 }); step(sec(10));
 
 // reminders: comes to the centre of the main screen
